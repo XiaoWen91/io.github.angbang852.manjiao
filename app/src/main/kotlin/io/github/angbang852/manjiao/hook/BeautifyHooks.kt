@@ -22,6 +22,7 @@ object BeautifyHooks {
     private val bottomLp = java.util.WeakHashMap<View, ViewGroup.LayoutParams>()
     private val bottomParents = java.util.WeakHashMap<View, ViewGroup>()
     private val bottomIndexes = java.util.WeakHashMap<View, Int>()
+    private val bottomTargets = java.util.WeakHashMap<View, View>()
     private val rightTagged = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val bottomContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val rightContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
@@ -108,6 +109,29 @@ object BeautifyHooks {
                     }
                 }
             }
+            try {
+                val tc = Class.forName("com.kwai.kcube.ext.actionbar.region.TabStripRegion", false, cl)
+                val om = tc.getDeclaredMethod("o")
+                install(module, om, "beauty.bottom.container") { chain ->
+                    val r = chain.proceed()
+                    if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
+                        try {
+                            val self = chain.thisObject
+                            for (n in arrayOf("i", "h", "j")) {
+                                try {
+                                    val f = tc.getDeclaredField(n)
+                                    f.isAccessible = true
+                                    (f.get(self) as? View)?.background = null
+                                } catch (_: Throwable) {
+                                }
+                            }
+                        } catch (_: Throwable) {
+                        }
+                    }
+                    r
+                }
+            } catch (_: Throwable) {
+            }
         } catch (t: Throwable) {
             Logger.d("beauty bottom miss: ${t.message}")
         }
@@ -122,15 +146,29 @@ object BeautifyHooks {
             val gf = try {
                 self.javaClass.getDeclaredField("g").apply { isAccessible = true }
             } catch (_: Throwable) { null }
-            val old = (gf?.get(self)?.toString() ?: tv?.text?.toString().orEmpty())
+            var old = (gf?.get(self)?.toString() ?: tv?.text?.toString().orEmpty())
+            if (old.isBlank()) old = labelFromF(self)
             val hide = hidden(Prefs.str(Prefs.K_BEAUTY_BOTTOM_HIDE, ""), old)
+            if (!hide && Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false) &&
+                (old.contains("拍摄") || old.contains("发布") || old.contains("+"))) {
+                val p = self.parent as? ViewGroup
+                if (p != null && p.childCount > 1 && p.indexOfChild(self) != p.childCount - 1) {
+                    p.removeView(self)
+                    p.addView(self)
+                    p.requestLayout()
+                }
+            }
             if (hide) {
                 val parent = self.parent as? ViewGroup
-                if (parent != null && !bottomParents.containsKey(self)) {
-                    bottomParents[self] = parent
-                    bottomIndexes[self] = parent.indexOfChild(self)
-                    bottomLp[self] = self.layoutParams
-                    parent.removeView(self)
+                val target = if (parent != null && parent.childCount == 1 && parent.parent is ViewGroup) parent else self
+                val targetParent = target.parent as? ViewGroup
+                if (targetParent != null && !bottomParents.containsKey(self)) {
+                    bottomParents[self] = targetParent
+                    bottomIndexes[self] = targetParent.indexOfChild(target)
+                    bottomLp[self] = target.layoutParams
+                    bottomTargets[self] = target
+                    targetParent.removeView(target)
+                    targetParent.requestLayout()
                 } else {
                     self.visibility = View.GONE
                     self.isClickable = false
@@ -141,9 +179,10 @@ object BeautifyHooks {
             } else {
                 val p = bottomParents.remove(self)
                 if (p != null) {
+                    val target = bottomTargets.remove(self) ?: self
                     val idx = (bottomIndexes.remove(self) ?: 0).coerceIn(0, p.childCount)
                     val lp = bottomLp.remove(self)
-                    if (lp != null) p.addView(self, idx, lp) else p.addView(self, idx)
+                    if (lp != null) p.addView(target, idx, lp) else p.addView(target, idx)
                     self.visibility = View.VISIBLE
                     self.isClickable = true
                     self.isFocusable = true
@@ -167,7 +206,7 @@ object BeautifyHooks {
                 self.background = null
                 var p: View? = self.parent as? View
                 var depth = 1
-                while (p != null && depth < 6) {
+                while (p != null && depth < 12) {
                     p.background = null
                     p = p.parent as? View
                     depth++
@@ -242,6 +281,7 @@ object BeautifyHooks {
                         rightTagged[ll] = true
                         rightContainers[ll] = true
                         applyRightContainer(ll)
+                        ll.postDelayed({ applyRightContainer(ll) }, 300L)
                     }
                 } catch (_: Throwable) {
                 }
@@ -250,14 +290,37 @@ object BeautifyHooks {
             val qc = Class.forName("qrd.d", false, cl)
             val bind = qc.getDeclaredMethod("a", java.util.List::class.java)
             install(module, bind, "beauty.right.bind") { chain ->
-                val r = chain.proceed()
+                val raw = chain.getArg(0) as? List<*>
+                val filtered = raw?.filterNot { shouldHideRightElement(it) }
+                val r = if (raw != null && filtered != null && filtered.size != raw.size) {
+                    chain.proceed(arrayOf<Any?>(filtered))
+                } else {
+                    chain.proceed()
+                }
                 try {
                     val self = chain.thisObject
                     val ll = self?.javaClass?.getMethod("l")?.invoke(self) as? ViewGroup
-                    if (ll != null && rightTagged.containsKey(ll)) applyRightContainer(ll)
+                    if (ll != null && rightTagged.containsKey(ll)) {
+                        applyRightContainer(ll)
+                        ll.postDelayed({ applyRightContainer(ll) }, 200L)
+                    }
                 } catch (_: Throwable) {
                 }
                 r
+            }
+            try {
+                val iM = qc.getDeclaredMethod("i")
+                install(module, iM, "beauty.right.layout") { chain ->
+                    val r = chain.proceed()
+                    try {
+                        val self = chain.thisObject
+                        val ll = self?.javaClass?.getMethod("l")?.invoke(self) as? ViewGroup
+                        if (ll != null && rightTagged.containsKey(ll)) applyRightContainer(ll)
+                    } catch (_: Throwable) {
+                    }
+                    r
+                }
+            } catch (_: Throwable) {
             }
         } catch (t: Throwable) {
             Logger.d("beauty right miss: ${t.message}")
@@ -280,14 +343,7 @@ object BeautifyHooks {
                 child.visibility = View.VISIBLE
             }
         }
-        if (hidden.isNotEmpty() && matched == 0) {
-            val order = listOf("头像", "点赞", "评论", "收藏", "音乐", "分享")
-            for ((idx, name) in order.withIndex()) {
-                if (hidden.contains(name) && idx < ll.childCount) {
-                    ll.getChildAt(idx).visibility = View.GONE
-                }
-            }
-        }
+        // no index fallback: filtering by element id is safer
         if (ll.childCount < 4) return
         uiRoots[ll] = "right"
         ll.translationX = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_X, "").toFloatOrNull() ?: 0f
@@ -304,6 +360,40 @@ object BeautifyHooks {
             if (c is ViewGroup && containsText(c)) return true
         }
         return false
+    }
+
+    private fun labelFromF(self: View): String {
+        return try {
+            val f = self.javaClass.getDeclaredField("f")
+            f.isAccessible = true
+            val k = f.get(self)
+            val b = k?.javaClass?.getDeclaredField("b")
+            b?.isAccessible = true
+            b?.get(k)?.toString().orEmpty()
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
+    private fun shouldHideRightElement(e: Any?): Boolean {
+        if (e == null) return false
+        val hidden = Prefs.str(Prefs.K_BEAUTY_RIGHT_HIDE, "")
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (hidden.isEmpty()) return false
+        val id = try {
+            e.javaClass.getMethod("I").invoke(e)?.toString().orEmpty().lowercase()
+        } catch (_: Throwable) {
+            e.javaClass.name.lowercase()
+        }
+        val map = mapOf(
+            "头像" to listOf("avatar", "head", "user"),
+            "点赞" to listOf("like"),
+            "评论" to listOf("comment"),
+            "收藏" to listOf("collect", "favorite"),
+            "分享" to listOf("share"),
+            "音乐" to listOf("music", "audio")
+        )
+        return hidden.any { name -> map[name]?.any { id.contains(it) } == true }
     }
 
     private fun rightKey(label: String): String? = when {
@@ -358,12 +448,10 @@ object BeautifyHooks {
     private fun hookCaptionInfo(module: XposedModule, cl: ClassLoader) {
         try {
             val c = Class.forName("u9b.a", false, cl)
-            val m = c.declaredMethods.firstOrNull { it.name == "c" && it.parameterCount == 5 }
-            if (m == null) return
-            install(module, m, "beauty.caption.info") { chain ->
+            val wf = Class.forName("wnb.f", false, cl)
+            val m = c.getDeclaredMethod("b", wf, Boolean::class.javaPrimitiveType!!)
+            install(module, m, "beauty.caption.time") { chain ->
                 val r = chain.proceed()
-                val isTime = Thread.currentThread().stackTrace.any { it.className.contains("KmpCreateTimeElement") }
-                if (!isTime) return@install r
                 val photo = chain.getArg(0)
                 if (photo == null) return@install r
                 val extra = ArrayList<String>()
@@ -376,13 +464,20 @@ object BeautifyHooks {
                     if (ip.isNotBlank()) extra.add(ip)
                 }
                 if (extra.isEmpty()) return@install r
+                val add = extra.joinToString("  ")
                 val old = (r as? String).orEmpty()
-                val add = extra.filter { old.isBlank() || !old.contains(it) }.joinToString("  ")
-                if (add.isBlank()) r else if (old.isBlank()) add else "$old  $add"
+                if (old.isBlank()) add else "$old  $add"
             }
         } catch (t: Throwable) {
             Logger.d("beauty caption info miss: ${t.message}")
         }
+    }
+
+    private fun looksLikeTime(s: String): Boolean {
+        if (s.isBlank()) return false
+        return s.contains("前") || s.contains("昨天") || s.contains("刚刚") ||
+            Regex("""\d{1,2}:\d{2}""").containsMatchIn(s) ||
+            Regex("""\d{1,2}-\d{1,2}""").containsMatchIn(s)
     }
 
     private fun callString(obj: Any, name: String): String {
