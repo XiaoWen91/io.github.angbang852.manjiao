@@ -144,11 +144,12 @@ object BeautifyHooks {
                 tv?.text = repl
             }
             if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
-                var p: android.view.ViewParent? = self
-                var depth = 0
-                while (p is View && depth < 4) {
+                self.setBackgroundColor(Color.TRANSPARENT)
+                var p: View? = self.parent as? View
+                var depth = 1
+                while (p != null && depth < 4) {
                     p.setBackgroundColor(Color.TRANSPARENT)
-                    p = p.parent
+                    p = p.parent as? View
                     depth++
                 }
             }
