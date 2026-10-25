@@ -20,6 +20,9 @@ object BeautifyHooks {
     private val uiRoots = java.util.WeakHashMap<View, String>()
     private val bottomViews = java.util.WeakHashMap<View, Boolean>()
     private val bottomLp = java.util.WeakHashMap<View, ViewGroup.LayoutParams>()
+    private val bottomParents = java.util.WeakHashMap<View, ViewGroup>()
+    private val bottomIndexes = java.util.WeakHashMap<View, Int>()
+    private val rightTagged = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val bottomContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val rightContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val pendantRoots = java.util.WeakHashMap<View, Boolean>()
@@ -122,28 +125,38 @@ object BeautifyHooks {
             val old = (gf?.get(self)?.toString() ?: tv?.text?.toString().orEmpty())
             val hide = hidden(Prefs.str(Prefs.K_BEAUTY_BOTTOM_HIDE, ""), old)
             if (hide) {
-                if (!bottomLp.containsKey(self)) bottomLp[self] = self.layoutParams
-                self.visibility = View.GONE
-                self.isClickable = false
-                self.isFocusable = false
-                self.isEnabled = false
-                val lp = self.layoutParams
-                if (lp is android.widget.LinearLayout.LayoutParams) {
-                    lp.width = 0
-                    lp.height = 0
-                    lp.weight = 0f
-                    self.layoutParams = lp
+                val parent = self.parent as? ViewGroup
+                if (parent != null && !bottomParents.containsKey(self)) {
+                    bottomParents[self] = parent
+                    bottomIndexes[self] = parent.indexOfChild(self)
+                    bottomLp[self] = self.layoutParams
+                    parent.removeView(self)
                 } else {
-                    self.layoutParams = ViewGroup.LayoutParams(0, 0)
+                    self.visibility = View.GONE
+                    self.isClickable = false
+                    self.isFocusable = false
+                    self.isEnabled = false
+                    tv?.visibility = View.GONE
                 }
-                tv?.visibility = View.GONE
             } else {
-                self.visibility = View.VISIBLE
-                self.isClickable = true
-                self.isFocusable = true
-                self.isEnabled = true
-                bottomLp.remove(self)?.let { self.layoutParams = it }
-                tv?.visibility = View.VISIBLE
+                val p = bottomParents.remove(self)
+                if (p != null) {
+                    val idx = (bottomIndexes.remove(self) ?: 0).coerceIn(0, p.childCount)
+                    val lp = bottomLp.remove(self)
+                    if (lp != null) p.addView(self, idx, lp) else p.addView(self, idx)
+                    self.visibility = View.VISIBLE
+                    self.isClickable = true
+                    self.isFocusable = true
+                    self.isEnabled = true
+                    tv?.visibility = View.VISIBLE
+                } else {
+                    self.visibility = View.VISIBLE
+                    self.isClickable = true
+                    self.isFocusable = true
+                    self.isEnabled = true
+                    bottomLp.remove(self)?.let { self.layoutParams = it }
+                    tv?.visibility = View.VISIBLE
+                }
             }
             val repl = replace(Prefs.str(Prefs.K_BEAUTY_BOTTOM_TEXT, ""), old)
             if (!hide && repl != old) {
@@ -219,33 +232,29 @@ object BeautifyHooks {
 
     private fun hookRightActionBar(module: XposedModule, cl: ClassLoader) {
         try {
-            val c = Class.forName("qrd.d", false, cl)
-            val ctor = c.declaredConstructors.firstOrNull { it.parameterCount >= 5 }
-            if (ctor != null) {
-                installCtor(module, ctor, "beauty.right.ctor") { chain ->
-                    val r = chain.proceed()
-                    try {
-                        val self = chain.thisObject
-                        val ll = self?.javaClass?.getMethod("l")?.invoke(self) as? ViewGroup
-                        if (ll != null) {
-                            rightContainers[ll] = true
-                            applyRightContainer(ll)
-                        }
-                    } catch (_: Throwable) {
+            val nc = Class.forName("com.yxcorp.gifshow.detail.slideplay.nasa.vm.slide.n", false, cl)
+            val b0 = nc.getDeclaredMethod("B0", android.widget.RelativeLayout::class.java)
+            install(module, b0, "beauty.right.hook") { chain ->
+                val r = chain.proceed()
+                try {
+                    val ll = r?.javaClass?.getMethod("l")?.invoke(r) as? ViewGroup
+                    if (ll != null) {
+                        rightTagged[ll] = true
+                        rightContainers[ll] = true
+                        applyRightContainer(ll)
                     }
-                    r
+                } catch (_: Throwable) {
                 }
+                r
             }
-            val bind = c.getDeclaredMethod("a", java.util.List::class.java)
+            val qc = Class.forName("qrd.d", false, cl)
+            val bind = qc.getDeclaredMethod("a", java.util.List::class.java)
             install(module, bind, "beauty.right.bind") { chain ->
                 val r = chain.proceed()
                 try {
                     val self = chain.thisObject
                     val ll = self?.javaClass?.getMethod("l")?.invoke(self) as? ViewGroup
-                    if (ll != null) {
-                        rightContainers[ll] = true
-                        applyRightContainer(ll)
-                    }
+                    if (ll != null && rightTagged.containsKey(ll)) applyRightContainer(ll)
                 } catch (_: Throwable) {
                 }
                 r
@@ -256,6 +265,7 @@ object BeautifyHooks {
     }
 
     private fun applyRightContainer(ll: ViewGroup) {
+        if (!rightTagged.containsKey(ll)) return
         if (ll.childCount < 2) return
         val hidden = Prefs.str(Prefs.K_BEAUTY_RIGHT_HIDE, "")
             .split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -352,6 +362,8 @@ object BeautifyHooks {
             if (m == null) return
             install(module, m, "beauty.caption.info") { chain ->
                 val r = chain.proceed()
+                val isTime = Thread.currentThread().stackTrace.any { it.className.contains("KmpCreateTimeElement") }
+                if (!isTime) return@install r
                 val photo = chain.getArg(0)
                 if (photo == null) return@install r
                 val extra = ArrayList<String>()
