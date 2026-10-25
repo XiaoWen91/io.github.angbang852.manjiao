@@ -42,6 +42,7 @@ object BeautifyHooks {
         hookPendant(module, cl)
         hookFullscreen(module, cl)
         hookHomeCoin(module, cl)
+        hookUnionView(module, cl)
         hookCaptionInfo(module, cl)
         hookCaptionTextView(module, cl)
         hookPlaybackAlpha(module, cl)
@@ -162,9 +163,9 @@ object BeautifyHooks {
                     val self = chain.thisObject as? View
                     if (self != null) {
                         if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false)) {
-                            val p = self.parent as? View
+                            val p = self.parent as? ViewGroup
                             if (p != null && p.width > 0 && self.width > 0) {
-                                val dx = (p.width - self.width - self.left).toFloat()
+                                val dx = centerGapTranslation(self, p)
                                 try { self.translationX = dx } catch (_: Throwable) {}
                             }
                         } else {
@@ -219,7 +220,12 @@ object BeautifyHooks {
                     .split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 if (hidden.any { text.contains(it) }) {
                     v.visibility = View.GONE
+                    (v.parent as? View)?.requestLayout()
+                    v.post { updateBottomShoot(v.rootView) }
                 }
+            }
+            if (cls.contains("BottomBarShootView")) {
+                v.post { updateBottomShoot(v.rootView) }
             }
             if (v is ViewGroup) {
                 for (i in 0 until v.childCount) {
@@ -227,6 +233,83 @@ object BeautifyHooks {
                 }
             }
         } catch (_: Throwable) {
+        }
+    }
+
+    private fun centerGapTranslation(v: View, p: ViewGroup): Float {
+        val center = v.left + v.width / 2f
+        var leftMax = 0
+        var rightMin = p.width
+        var hasLeft = false
+        var hasRight = false
+        for (i in 0 until p.childCount) {
+            val c = p.getChildAt(i)
+            if (c === v || c.visibility != View.VISIBLE || c.width <= 0) continue
+            val cc = c.left + c.width / 2f
+            if (cc < center) {
+                if (!hasLeft || c.right > leftMax) { leftMax = c.right; hasLeft = true }
+            } else {
+                if (!hasRight || c.left < rightMin) { rightMin = c.left; hasRight = true }
+            }
+        }
+        val gapCenter = when {
+            hasLeft && hasRight -> (leftMax + rightMin) / 2f
+            hasLeft -> (leftMax + p.width) / 2f
+            hasRight -> rightMin / 2f
+            else -> p.width / 2f
+        }
+        val desiredLeft = gapCenter - v.width / 2f
+        return desiredLeft - v.left
+    }
+
+    private fun updateBottomShoot(v: View?) {
+        if (v == null) return
+        try {
+            if (v.javaClass.name.contains("BottomBarShootView") && Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false)) {
+                val p = v.parent as? ViewGroup
+                if (p != null && p.width > 0 && v.width > 0) {
+                    v.translationX = centerGapTranslation(v, p)
+                }
+            }
+            if (v is ViewGroup) {
+                for (i in 0 until v.childCount) updateBottomShoot(v.getChildAt(i))
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun hookUnionView(module: XposedModule, cl: ClassLoader) {
+        try {
+            val c = Class.forName("com.kuaishou.growth.pendant.coin.core.kds.unionwidget.UnionView", false, cl)
+            val ctor = c.declaredConstructors.minByOrNull { it.parameterCount }
+            if (ctor != null) {
+                installCtor(module, ctor, "beauty.union.ctor") { chain ->
+                    val r = chain.proceed()
+                    try {
+                        val self = chain.thisObject as? View
+                        if (self != null && Prefs.bool(Prefs.K_BEAUTY_NO_COIN, false)) self.visibility = View.GONE
+                    } catch (_: Throwable) {
+                    }
+                    r
+                }
+            }
+            for (m in c.declaredMethods) {
+                if (m.name == "onAttachedToWindow" || m.name == "onVisibilityChanged") {
+                    install(module, m, "beauty.union.${m.name}") { chain ->
+                        val r = chain.proceed()
+                        try {
+                            val self = chain.thisObject as? View
+                            if (self != null && Prefs.bool(Prefs.K_BEAUTY_NO_COIN, false) && self.visibility != View.GONE) {
+                                self.visibility = View.GONE
+                            }
+                        } catch (_: Throwable) {
+                        }
+                        r
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            Logger.d("beauty union miss: ${t.message}")
         }
     }
 
@@ -705,8 +788,15 @@ object BeautifyHooks {
                     val self = chain.thisObject
                     val f = j2.getDeclaredField("c")
                     f.isAccessible = true
-                    (f.get(self) as? View)?.let {
-                        uiRoots[it] = "top"
+                    (f.get(self) as? View)?.let { v ->
+                        uiRoots[v] = "top"
+                        var p = v.parent as? View
+                        var depth = 0
+                        while (p != null && depth < 2) {
+                            uiRoots[p] = "topParent"
+                            p = p.parent as? View
+                            depth++
+                        }
                         applyPlayAlpha(null)
                     }
                 } catch (_: Throwable) {
@@ -717,9 +807,13 @@ object BeautifyHooks {
             val i2 = Class.forName("t6h.i2", false, cl)
             val accept = i2.getDeclaredMethod("accept", Any::class.java)
             install(module, accept, "beauty.play.alpha.apply") { chain ->
-                val observed = chain.getArg(0) as? Float
-                val r = chain.proceed()
-                applyPlayAlpha(observed)
+                val playing = isPlaying()
+                val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
+                var raw = Prefs.str(key, "")
+                if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
+                val target = raw.toFloatOrNull()?.coerceIn(0f, 1f)
+                val r = if (target != null) chain.proceed(arrayOf<Any?>(target)) else chain.proceed()
+                applyPlayAlpha(null)
                 r
             }
         } catch (t: Throwable) {
@@ -729,7 +823,7 @@ object BeautifyHooks {
 
     private fun applyPlayAlpha(observed: Float?) {
         try {
-            val playing = if (observed != null) observed < 0.99f else isPlaying()
+            val playing = isPlaying()
             val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
             var raw = Prefs.str(key, "")
             if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")

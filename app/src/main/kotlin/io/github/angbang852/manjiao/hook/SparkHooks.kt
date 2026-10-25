@@ -24,6 +24,7 @@ import java.util.Locale
  */
 object SparkHooks {
     private val installed: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    private var autoAttemptedDate: String? = null
 
     fun hook(module: XposedModule, cl: ClassLoader) {
         SparkSender.attach(cl)
@@ -37,6 +38,7 @@ object SparkHooks {
         hookSettingsEntry(module, cl)
         hookAntiRecall(module, cl)
         hookNoWatermark(module, cl)
+        hookAutoSpark(module, cl)
     }
 
     fun selfTest(): String {
@@ -51,7 +53,8 @@ object SparkHooks {
             "spark.contacts.",
             "spark.settings.entry",
             "spark.anti_recall.",
-            "spark.no_wm."
+            "spark.no_wm.",
+            "spark.auto.resume"
         )
         val lines = expected.map { prefix ->
             val ok = installed.any { it == prefix || it.startsWith(prefix) }
@@ -458,6 +461,63 @@ object SparkHooks {
         } catch (t: Throwable) {
             Logger.d("spark settings entry miss: ${t.message}")
         }
+    }
+
+    private fun hookAutoSpark(module: XposedModule, cl: ClassLoader) {
+        try {
+            val c = Class.forName("com.yxcorp.gifshow.HomeActivity", false, cl)
+            val m = c.getDeclaredMethod("onResume")
+            install(module, m, "spark.auto.resume") { chain ->
+                val r = chain.proceed()
+                try {
+                    val act = chain.thisObject as? Activity
+                    if (act != null) {
+                        val ctx = act.applicationContext
+                        Thread {
+                            try {
+                                checkAutoSpark(ctx)
+                            } catch (t: Throwable) {
+                                Logger.d("spark auto failed: ${t.message}")
+                            }
+                        }.start()
+                    }
+                } catch (_: Throwable) {
+                }
+                r
+            }
+        } catch (t: Throwable) {
+            Logger.d("spark auto hook miss: ${t.message}")
+        }
+    }
+
+    private fun checkAutoSpark(context: Context) {
+        if (!Prefs.bool(Prefs.K_SPARK_ENABLED, true)) return
+        val targets = Prefs.str(Prefs.K_SPARK_TARGETS, "")
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (targets.isEmpty()) return
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        if (autoAttemptedDate == today) return
+        val raw = Prefs.str(Prefs.K_SPARK_AUTO_SENT, "")
+        val sent = if (raw.startsWith("$today:")) {
+            raw.substringAfter(':').split(",").filter { it.isNotBlank() }.toMutableSet()
+        } else {
+            mutableSetOf<String>()
+        }
+        val pending = targets.filter { !sent.contains(it) }
+        autoAttemptedDate = today
+        if (pending.isEmpty()) return
+        val msg = Prefs.str(Prefs.K_SPARK_MESSAGE, "").trim().ifEmpty { "续火花" }
+        var ok = 0
+        for (id in pending) {
+            if (SparkSender.send(context, id, msg)) {
+                sent.add(id)
+                ok++
+            }
+        }
+        if (ok > 0) {
+            Prefs.setStrSync(context, Prefs.K_SPARK_AUTO_SENT, "$today:" + sent.joinToString(","))
+        }
+        Logger.d("spark auto done ok=$ok pending=${pending.size}")
     }
 
     private fun findBubbleText(presenter: Any?, holder: Any?): TextView? {
