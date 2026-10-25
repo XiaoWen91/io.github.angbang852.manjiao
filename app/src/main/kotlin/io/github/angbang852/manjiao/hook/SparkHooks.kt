@@ -219,6 +219,7 @@ object SparkHooks {
                         install(module, m, "spark.contacts.bind") { chain ->
                             val arg = if (hasArg) chain.getArg(0) else chain.thisObject
                             SparkContacts.noteBindTarget(arg)
+                            SparkContacts.noteBindTarget(chain.thisObject)
                             val r = chain.proceed()
                             SparkContacts.noteBindFallbackName(chain.thisObject)
                             r
@@ -228,6 +229,7 @@ object SparkHooks {
                     if (m.name == "a" && m.parameterTypes.isNotEmpty()) {
                         install(module, m, "spark.contacts.uistate") { chain ->
                             SparkContacts.noteBindUiState(chain.getArg(0), chain.thisObject)
+                            SparkContacts.noteBindUiState(chain.thisObject, chain.thisObject)
                             chain.proceed()
                         }
                         hooked = true
