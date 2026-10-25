@@ -438,6 +438,7 @@ class SettingsActivity : AppCompatActivity() {
         val actions = listOf(
             Item("🔥", "续火花", "目标好友 / 固定消息 / 静默发送") { showSpark() },
             Item("⚙️", "增强功能", "防撤回 / 去水印 / 免已读 / 精确时间") { showEnhanced() },
+            Item("🎨", "美化", "DPI / 底栏 / 右侧组件 / 播放 UI") { showBeautify() },
             Item("🪟", "打开快手", "分享按钮 → 模块入口") { openModuleMenuHint() },
             Item("🌐", "项目仓库", "查看源码与更新日志") { openUrl(REPO_URL) },
             Item("💬", "问题反馈", "自动带上版本信息，无需手填") { openUrl(feedbackUrl()) },
@@ -1139,6 +1140,14 @@ class SettingsActivity : AppCompatActivity() {
             )
             android.widget.Toast.makeText(this, "已保存", android.widget.Toast.LENGTH_SHORT).show()
         }))
+        jellyEnter(panel)
+    }
+
+    private fun showBeautify() {
+        clearPanel()
+        panelRestorer = { showBeautify() }
+        panel.addView(header("美化", true) { showMain() })
+        panel.addView(BeautifyUi.build(this))
         jellyEnter(panel)
     }
 

@@ -27,6 +27,7 @@ object SparkHooks {
 
     fun hook(module: XposedModule, cl: ClassLoader) {
         SparkSender.attach(cl)
+        BeautifyHooks.hook(module, cl)
         hookNoSplash(module, cl)
         hookNoRead(module, cl)
         hookExactTime(module, cl)

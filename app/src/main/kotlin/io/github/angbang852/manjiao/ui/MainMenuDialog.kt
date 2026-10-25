@@ -117,6 +117,7 @@ object MainMenuDialog {
         val items = listOf(
             Item("", "续火花") { showSpark(ctx) },
             Item("", "增强功能") { showEnhanced(ctx) },
+            Item("", "美化") { showBeautify(ctx) },
         )
         mark("buildItems")
         showSheet(ctx, "ManJiao", items, null)
@@ -319,6 +320,12 @@ object MainMenuDialog {
             Prefs.setBoolSync(ctx, Prefs.K_SPARK_SILENT, silent)
             toast(ctx, "已保存")
         }, { show(ctx) })
+    }
+
+    // ==================== 美化 ====================
+
+    private fun showBeautify(ctx: Context) {
+        showSheetScroll(ctx, "美化", { show(ctx) }, BeautifyUi.build(ctx))
     }
 
     // ==================== 增强功能 ====================

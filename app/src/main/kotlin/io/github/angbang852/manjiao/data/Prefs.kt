@@ -51,6 +51,20 @@ object Prefs {
     const val K_SPARK_EXACT_TIME = "spark_exact_time"
     const val K_SPARK_NO_READ = "spark_no_read"
     const val K_SPARK_REAL_COUNT = "spark_real_count"
+
+    // ==================== 美化 ====================
+    const val K_BEAUTY_DPI = "beauty_dpi"
+    const val K_BEAUTY_BOTTOM_HIDE = "beauty_bottom_hide"
+    const val K_BEAUTY_BOTTOM_TEXT = "beauty_bottom_text"
+    const val K_BEAUTY_BOTTOM_STYLE = "beauty_bottom_style"
+    const val K_BEAUTY_BOTTOM_TRANSPARENT = "beauty_bottom_transparent"
+    const val K_BEAUTY_RIGHT_HIDE = "beauty_right_hide"
+    const val K_BEAUTY_RIGHT_OFFSET_X = "beauty_right_offset_x"
+    const val K_BEAUTY_RIGHT_OFFSET_Y = "beauty_right_offset_y"
+    const val K_BEAUTY_RIGHT_SCALE = "beauty_right_scale"
+    const val K_BEAUTY_PLAY_ALPHA = "beauty_play_alpha"
+    const val K_BEAUTY_NO_FULLSCREEN = "beauty_no_fullscreen"
+    const val K_BEAUTY_NO_COIN = "beauty_no_coin"
     const val K_DL_PATH = "dl_path"
     const val DEFAULT_PATH = "/sdcard/Download"
 
