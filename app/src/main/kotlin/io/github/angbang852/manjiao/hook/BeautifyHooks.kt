@@ -17,9 +17,11 @@ import java.lang.reflect.Method
  */
 object BeautifyHooks {
     private val tabRoles = java.util.WeakHashMap<View, String>()
-    private val uiRoots = java.util.WeakHashMap<View, Boolean>()
+    private val uiRoots = java.util.WeakHashMap<View, String>()
+    private var loader: ClassLoader? = null
 
     fun hook(module: XposedModule, cl: ClassLoader) {
+        loader = cl
         hookDpi(module)
         hookBottomBar(module, cl)
         hookBottomReorder(module, cl)
@@ -79,9 +81,10 @@ object BeautifyHooks {
                 val r = chain.proceed()
                 val self = chain.thisObject as? View
                 if (self != null) {
-                    uiRoots[self] = true
+                    uiRoots[self] = "bottom"
                     if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
                         self.setBackgroundColor(Color.TRANSPARENT)
+                        (self.parent as? View)?.setBackgroundColor(Color.TRANSPARENT)
                     }
                 }
                 r
@@ -101,6 +104,11 @@ object BeautifyHooks {
                     val container = chain.getArg(0) as? ViewGroup
                     val r = chain.proceed()
                     val v = r as? View
+                    if (container != null) {
+                        if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
+                            container.setBackgroundColor(Color.TRANSPARENT)
+                        }
+                    }
                     if (container != null && v != null) {
                         tabRoles[v] = role
                         container.postDelayed({ reorderBottom(container) }, 350L)
@@ -142,7 +150,7 @@ object BeautifyHooks {
                     try {
                         val f = j2.getDeclaredField("c")
                         f.isAccessible = true
-                        (f.get(self) as? View)?.let { uiRoots[it] = true }
+                        (f.get(self) as? View)?.let { uiRoots[it] = "top" }
                     } catch (_: Throwable) {
                     }
                 }
@@ -162,15 +170,26 @@ object BeautifyHooks {
     }
 
     private fun applyPlayAlpha() {
-        val alpha = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "").toFloatOrNull()?.coerceIn(0f, 1f) ?: return
+        val key = if (isPlaying()) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
+        var raw = Prefs.str(key, "")
+        if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
+        val alpha = raw.toFloatOrNull()?.coerceIn(0f, 1f) ?: return
         val it = uiRoots.keys.iterator()
         while (it.hasNext()) {
             val v = it.next()
-            if (v.isAttachedToWindow) {
-                v.alpha = alpha
-            } else {
-                it.remove()
-            }
+            if (v.isAttachedToWindow) v.alpha = alpha else it.remove()
+        }
+    }
+
+    private fun isPlaying(): Boolean {
+        val cl = loader ?: return true
+        return try {
+            val c = Class.forName("gih.w6", false, cl)
+            val m = c.getDeclaredMethod("V")
+            m.isAccessible = true
+            (m.invoke(null) as? Boolean) ?: true
+        } catch (_: Throwable) {
+            true
         }
     }
 
@@ -194,7 +213,7 @@ object BeautifyHooks {
         if (self == null) return
         try {
             val ll = self.javaClass.getMethod("l").invoke(self) as? ViewGroup ?: return
-            uiRoots[ll] = true
+            uiRoots[ll] = "right"
             val hidden = Prefs.str(Prefs.K_BEAUTY_RIGHT_HIDE, "")
                 .split(",").map { it.trim() }.filter { it.isNotEmpty() }
             if (hidden.isNotEmpty()) {
