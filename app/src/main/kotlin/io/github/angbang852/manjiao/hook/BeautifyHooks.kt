@@ -188,9 +188,7 @@ object BeautifyHooks {
                 val r = chain.proceed()
                 try {
                     val a = chain.thisObject as? android.app.Activity
-                    if (a != null && Prefs.bool(Prefs.K_BEAUTY_NO_COIN, false)) {
-                        hideCoinViews(a.window.decorView)
-                    }
+                    if (a != null) applyHomeViews(a.window.decorView)
                 } catch (_: Throwable) {
                 }
                 r
@@ -200,17 +198,33 @@ object BeautifyHooks {
         }
     }
 
-    private fun hideCoinViews(v: View) {
+    private fun applyHomeViews(v: View, path: String = "") {
         try {
-            if (v.javaClass.name.contains("TKYogaLayout")) {
-                val txt = v.contentDescription?.toString().orEmpty() + " " +
-                    ((v as? TextView)?.text?.toString().orEmpty())
-                if (txt.contains("红包") || txt.contains("金币") || txt.contains("奖励") || txt.contains("现金")) {
+            val cls = v.javaClass.name
+            val text = deepText(v)
+            if (Prefs.bool(Prefs.K_BEAUTY_NO_COIN, false)) {
+                if (cls.contains("UnionView")) {
+                    v.visibility = View.GONE
+                } else if (cls.contains("TKYogaLayout") &&
+                    (text.contains("红包") || text.contains("金币") || text.contains("奖励") || text.contains("现金"))) {
+                    v.visibility = View.GONE
+                }
+            }
+            if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false) &&
+                path == "0/1/0/0/1/0/0/0/0/0/1/0/0" && cls.contains("ImageSwitchView")) {
+                v.visibility = View.GONE
+            }
+            if (cls.contains("TabLayout\$TabView") || cls.contains("TabLayout\$Tabview")) {
+                val hidden = Prefs.str(Prefs.K_BEAUTY_BOTTOM_HIDE, "")
+                    .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                if (hidden.any { text.contains(it) }) {
                     v.visibility = View.GONE
                 }
             }
             if (v is ViewGroup) {
-                for (i in 0 until v.childCount) hideCoinViews(v.getChildAt(i))
+                for (i in 0 until v.childCount) {
+                    applyHomeViews(v.getChildAt(i), if (path.isEmpty()) i.toString() else "$path/$i")
+                }
             }
         } catch (_: Throwable) {
         }
@@ -610,7 +624,17 @@ object BeautifyHooks {
                         val add = captionExtra(photo)
                         val old = tv.text?.toString().orEmpty()
                         if (add.isNotBlank() && !old.contains(add)) {
-                            tv.text = if (old.isBlank()) add else old + "\n" + add
+                            val sb = android.text.SpannableStringBuilder()
+                            if (old.isNotEmpty()) sb.append(old).append('\n')
+                            val start = sb.length
+                            sb.append(add)
+                            sb.setSpan(
+                                android.text.style.ForegroundColorSpan(0xFF888888.toInt()),
+                                start,
+                                sb.length,
+                                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                            )
+                            tv.text = sb
                         }
                     }
                 } catch (_: Throwable) {
@@ -631,7 +655,10 @@ object BeautifyHooks {
         }
         if (Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) {
             val ip = callString(photo, "getCaptionIpLocation")
-            if (ip.isNotBlank()) extra.add(ip)
+            if (ip.isNotBlank()) {
+                val clean = ip.removePrefix("IP属地：").removePrefix("IP属地:").removePrefix("IP:")
+                extra.add("IP:$clean")
+            }
         }
         return extra.joinToString("  ")
     }
