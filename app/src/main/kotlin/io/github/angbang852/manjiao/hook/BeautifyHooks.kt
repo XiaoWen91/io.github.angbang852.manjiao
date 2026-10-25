@@ -23,6 +23,8 @@ object BeautifyHooks {
     private val bottomParents = java.util.WeakHashMap<View, ViewGroup>()
     private val bottomIndexes = java.util.WeakHashMap<View, Int>()
     private val bottomTargets = java.util.WeakHashMap<View, View>()
+    private val bottomRegions = java.util.WeakHashMap<Any, Boolean>()
+    private val bottomTabEntries = java.util.WeakHashMap<ViewGroup, MutableList<Triple<View, Int, ViewGroup.LayoutParams>>>()
     private val rightTagged = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val bottomContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val rightContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
@@ -45,6 +47,7 @@ object BeautifyHooks {
         try {
             bottomViews.keys.toList().forEach { applyBottomView(it) }
             bottomContainers.keys.toList().forEach { reorderBottom(it) }
+            bottomRegions.keys.toList().forEach { applyBottomContainer(it) }
             rightContainers.keys.toList().forEach { applyRightContainer(it) }
             pendantRoots.keys.toList().forEach { applyPendant(it) }
             applyPlayAlpha(null)
@@ -114,17 +117,21 @@ object BeautifyHooks {
                 val om = tc.getDeclaredMethod("o")
                 install(module, om, "beauty.bottom.container") { chain ->
                     val r = chain.proceed()
-                    if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
+                    val self = chain.thisObject
+                    if (self != null) {
+                        bottomRegions[self] = true
                         try {
-                            val self = chain.thisObject
-                            for (n in arrayOf("i", "h", "j")) {
-                                try {
-                                    val f = tc.getDeclaredField(n)
-                                    f.isAccessible = true
-                                    (f.get(self) as? View)?.background = null
-                                } catch (_: Throwable) {
+                            if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
+                                for (n in arrayOf("i", "h", "j")) {
+                                    try {
+                                        val f = tc.getDeclaredField(n)
+                                        f.isAccessible = true
+                                        (f.get(self) as? View)?.background = null
+                                    } catch (_: Throwable) {
+                                    }
                                 }
                             }
+                            applyBottomContainer(self)
                         } catch (_: Throwable) {
                         }
                     }
@@ -290,13 +297,12 @@ object BeautifyHooks {
             val qc = Class.forName("qrd.d", false, cl)
             val bind = qc.getDeclaredMethod("a", java.util.List::class.java)
             install(module, bind, "beauty.right.bind") { chain ->
-                val raw = chain.getArg(0) as? List<*>
-                val filtered = raw?.filterNot { shouldHideRightElement(it) }
-                val r = if (raw != null && filtered != null && filtered.size != raw.size) {
-                    chain.proceed(arrayOf<Any?>(filtered))
-                } else {
-                    chain.proceed()
+                try {
+                    val raw = chain.getArg(0) as? MutableList<Any?>
+                    raw?.removeAll { shouldHideRightElement(it) }
+                } catch (_: Throwable) {
                 }
+                val r = chain.proceed()
                 try {
                     val self = chain.thisObject
                     val ll = self?.javaClass?.getMethod("l")?.invoke(self) as? ViewGroup
@@ -346,11 +352,34 @@ object BeautifyHooks {
         // no index fallback: filtering by element id is safer
         if (ll.childCount < 4) return
         uiRoots[ll] = "right"
-        ll.translationX = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_X, "").toFloatOrNull() ?: 0f
-        ll.translationY = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_Y, "").toFloatOrNull() ?: 0f
+        setRightTranslationX(ll, Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_X, "").toFloatOrNull() ?: 0f)
+        try {
+            ll.translationY = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_Y, "").toFloatOrNull() ?: 0f
+        } catch (_: Throwable) {
+        }
         val s = Prefs.str(Prefs.K_BEAUTY_RIGHT_SCALE, "").toFloatOrNull() ?: 1f
-        ll.scaleX = s
-        ll.scaleY = s
+        try {
+            ll.scaleX = s
+            ll.scaleY = s
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun setRightTranslationX(ll: ViewGroup, x: Float) {
+        try {
+            val m = ll.javaClass.getMethod(
+                "setTranslationX",
+                String::class.java,
+                Float::class.javaPrimitiveType!!
+            )
+            m.isAccessible = true
+            m.invoke(ll, "manjiao_right", x)
+        } catch (_: Throwable) {
+            try {
+                ll.translationX = x
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     private fun containsText(group: ViewGroup): Boolean {
@@ -360,6 +389,64 @@ object BeautifyHooks {
             if (c is ViewGroup && containsText(c)) return true
         }
         return false
+    }
+
+    private fun applyBottomContainer(region: Any?) {
+        if (region == null) return
+        try {
+            val f = region.javaClass.getDeclaredField("i")
+            f.isAccessible = true
+            val strip = f.get(region) ?: return
+            val container = strip.javaClass.getMethod("getTabsContainer").invoke(strip) as? ViewGroup ?: return
+            val hidden = Prefs.str(Prefs.K_BEAUTY_BOTTOM_HIDE, "")
+                .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            val saved = bottomTabEntries[container]
+            if (saved != null) {
+                for (e in saved.sortedBy { it.second }) {
+                    if (e.first.parent == null) {
+                        val idx = e.second.coerceIn(0, container.childCount)
+                        container.addView(e.first, idx, e.third)
+                    }
+                }
+                saved.clear()
+            }
+            for (i in container.childCount - 1 downTo 0) {
+                val ch = container.getChildAt(i)
+                val text = deepText(ch)
+                if (hidden.any { text.contains(it) }) {
+                    bottomTabEntries.getOrPut(container) { ArrayList() }
+                        .add(Triple(ch, i, ch.layoutParams))
+                    container.removeViewAt(i)
+                }
+            }
+            if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false)) {
+                for (i in 0 until container.childCount) {
+                    val ch = container.getChildAt(i)
+                    val text = deepText(ch)
+                    if (text.contains("拍摄") || text.contains("发布") || text.contains("+")) {
+                        container.removeView(ch)
+                        container.addView(ch)
+                        break
+                    }
+                }
+            }
+            container.requestLayout()
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun deepText(v: View): String {
+        val sb = StringBuilder()
+        fun walk(x: View) {
+            val cd = x.contentDescription?.toString().orEmpty()
+            if (cd.isNotEmpty()) sb.append(cd).append(' ')
+            if (x is TextView && !x.text.isNullOrEmpty()) sb.append(x.text).append(' ')
+            if (x is ViewGroup) {
+                for (i in 0 until x.childCount) walk(x.getChildAt(i))
+            }
+        }
+        walk(v)
+        return sb.toString()
     }
 
     private fun labelFromF(self: View): String {
