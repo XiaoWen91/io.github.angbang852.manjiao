@@ -221,8 +221,52 @@ object SparkHooks {
             install(module, origin, "spark.anti_recall.origin") { chain ->
                 chain.proceed()
             }
+
+            val notice = r.getDeclaredMethod("getNotice")
+            install(module, notice, "spark.anti_recall.notice") { chain ->
+                val res = chain.proceed()
+                if (Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true) && res != null) {
+                    try {
+                        val f = res.javaClass.getDeclaredField("b")
+                        f.isAccessible = true
+                        f.set(res, "这条消息已撤回")
+                    } catch (_: Throwable) {
+                    }
+                }
+                res
+            }
+
+            try {
+                val presenter = Class.forName("brj.a", false, cl)
+                val render = presenter.declaredMethods.firstOrNull {
+                    it.name == "n2" && it.parameterCount == 3
+                }
+                if (render != null) {
+                    install(module, render, "spark.anti_recall.render") { chain ->
+                        val r = chain.proceed()
+                        if (Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true)) {
+                            try {
+                                val msg = chain.getArg(0)
+                                val origin = msg?.javaClass?.getMethod("getOriginMsg")?.invoke(msg)
+                                if (origin != null) {
+                                    val text = origin.javaClass.getMethod("getText").invoke(origin) as? String
+                                    val self = chain.thisObject
+                                    if (!text.isNullOrEmpty() && self != null) {
+                                        val f = self.javaClass.getDeclaredField("A")
+                                        f.isAccessible = true
+                                        (f.get(self) as? TextView)?.text = text
+                                    }
+                                }
+                            } catch (_: Throwable) {
+                            }
+                        }
+                        r
+                    }
+                }
+            } catch (_: Throwable) {
+            }
         } catch (t: Throwable) {
-            Logger.d("spark anti_recall origin miss: ${t.message}")
+            Logger.d("spark anti_recall origin/notice miss: ${t.message}")
         }
     }
 
@@ -249,7 +293,11 @@ object SparkHooks {
                 install(module, m, "spark.no_wm.url") { chain ->
                     val r = chain.proceed()
                     if (!Prefs.bool(Prefs.K_SPARK_NO_WATERMARK, true)) return@install r
-                    val urls = getField(chain.thisObject, "mVideoUrls")
+                    val resp = chain.getArg(0)
+                    if (resp == null) return@install r
+                    setBoolField(resp.javaClass, resp, "mNotNeedWaterMark", true)
+                    setBoolField(resp.javaClass, resp, "mHasWatermark", false)
+                    val urls = getField(resp, "mVideoUrls")
                     if (urls is Array<*> && urls.isNotEmpty()) urls else r
                 }
             }
