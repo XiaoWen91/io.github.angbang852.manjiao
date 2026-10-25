@@ -125,8 +125,9 @@ object SparkSender {
             }
 
             try {
-                cKmpClients = Class.forName(CLS_KMP_CLIENTS, false, cl)
-                mKmpClientsOf = findStaticStringFactory(cKmpClients)
+                val clientsCls = Class.forName(CLS_KMP_CLIENTS, false, cl)
+                cKmpClients = clientsCls
+                mKmpClientsOf = findStaticStringFactory(clientsCls)
                     ?: throw IllegalStateException("clients_of")
 
                 val clientCls = mKmpClientsOf!!.returnType
