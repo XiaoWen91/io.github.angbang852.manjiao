@@ -34,6 +34,8 @@ object SparkHooks {
         hookTimeNoWrap(module, cl)
         hookContacts(module, cl)
         hookSettingsEntry(module, cl)
+        hookAntiRecall(module, cl)
+        hookNoWatermark(module, cl)
     }
 
     fun selfTest(): String {
@@ -46,7 +48,9 @@ object SparkHooks {
             "spark.time_nowrap1",
             "spark.time_nowrap2",
             "spark.contacts.",
-            "spark.settings.entry"
+            "spark.settings.entry",
+            "spark.anti_recall.",
+            "spark.no_wm."
         )
         val lines = expected.map { prefix ->
             val ok = installed.any { it == prefix || it.startsWith(prefix) }
@@ -194,6 +198,122 @@ object SparkHooks {
         } catch (t: Throwable) {
             Logger.d("spark time_nowrap2 miss: ${t.message}")
         }
+    }
+
+    private fun hookAntiRecall(module: XposedModule, cl: ClassLoader) {
+        try {
+            val k = Class.forName("com.yxcorp.gifshow.message.sdk.message.KRecalledMsg", false, cl)
+            val summary = k.getDeclaredMethod("getSummary")
+            install(module, summary, "spark.anti_recall.summary") { chain ->
+                if (Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true)) {
+                    "这条消息已撤回"
+                } else {
+                    chain.proceed()
+                }
+            }
+        } catch (t: Throwable) {
+            Logger.d("spark anti_recall summary miss: ${t.message}")
+        }
+
+        try {
+            val r = Class.forName("com.kwai.imsdk.msg.RecalledMsg", false, cl)
+            val origin = r.getDeclaredMethod("getOriginMsg")
+            install(module, origin, "spark.anti_recall.origin") { chain ->
+                chain.proceed()
+            }
+        } catch (t: Throwable) {
+            Logger.d("spark anti_recall origin miss: ${t.message}")
+        }
+    }
+
+    private fun hookNoWatermark(module: XposedModule, cl: ClassLoader) {
+        try {
+            val c = Class.forName("com.yxcorp.gifshow.photo.download.api.response.DownloadPhotoInfoResponse", false, cl)
+            val m = c.getDeclaredMethod("afterDeserialize")
+            install(module, m, "spark.no_wm.flag") { chain ->
+                val r = chain.proceed()
+                if (Prefs.bool(Prefs.K_SPARK_NO_WATERMARK, true)) {
+                    setBoolField(c, chain.thisObject, "mNotNeedWaterMark", true)
+                    setBoolField(c, chain.thisObject, "mHasWatermark", false)
+                }
+                r
+            }
+        } catch (t: Throwable) {
+            Logger.d("spark no_wm flag miss: ${t.message}")
+        }
+
+        try {
+            val c = Class.forName("com.yxcorp.gifshow.photo.download.api.response.DownloadPhotoInfoResponse", false, cl)
+            for (m in c.declaredMethods) {
+                if (m.name != "getDownloadUrl" || m.parameterCount != 1) continue
+                install(module, m, "spark.no_wm.url") { chain ->
+                    val r = chain.proceed()
+                    if (!Prefs.bool(Prefs.K_SPARK_NO_WATERMARK, true)) return@install r
+                    val urls = getField(chain.thisObject, "mVideoUrls")
+                    if (urls is Array<*> && urls.isNotEmpty()) urls else r
+                }
+            }
+        } catch (t: Throwable) {
+            Logger.d("spark no_wm url miss: ${t.message}")
+        }
+
+        hookNoWmBoolArg(module, cl, "hqk.x1", arrayOf("i", "j"), 1, "spark.no_wm.img")
+        hookNoWmBoolArg(module, cl, "hqk.c3", arrayOf("h"), 2, "spark.no_wm.album")
+        hookNoWmBoolArg(module, cl, "f3m.b", arrayOf("a"), 0, "spark.no_wm.export")
+    }
+
+    private fun hookNoWmBoolArg(
+        module: XposedModule,
+        cl: ClassLoader,
+        className: String,
+        names: Array<String>,
+        argIndex: Int,
+        idPrefix: String
+    ) {
+        try {
+            val c = Class.forName(className, false, cl)
+            for (m in c.declaredMethods) {
+                if (m.name !in names) continue
+                val p = m.parameterTypes
+                if (argIndex >= p.size || p[argIndex] != Boolean::class.javaPrimitiveType) continue
+                install(module, m, "$idPrefix.${m.name}") { chain ->
+                    val r = chain.proceed()
+                    if (!Prefs.bool(Prefs.K_SPARK_NO_WATERMARK, true)) return@install r
+                    val args = chain.args.toMutableList()
+                    if (args.size > argIndex && args[argIndex] == true) {
+                        args[argIndex] = false
+                        return@install chain.proceed(args.toTypedArray())
+                    }
+                    r
+                }
+            }
+        } catch (t: Throwable) {
+            Logger.d("spark no_wm $idPrefix miss: ${t.message}")
+        }
+    }
+
+    private fun setBoolField(cls: Class<*>, obj: Any?, name: String, value: Boolean) {
+        try {
+            val f = cls.getDeclaredField(name)
+            f.isAccessible = true
+            f.setBoolean(obj, value)
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun getField(obj: Any?, name: String): Any? {
+        if (obj == null) return null
+        var c: Class<*>? = obj.javaClass
+        while (c != null) {
+            try {
+                val f = c.getDeclaredField(name)
+                f.isAccessible = true
+                return f.get(obj)
+            } catch (_: Throwable) {
+                c = c.superclass
+            }
+        }
+        return null
     }
 
     private fun hookContacts(module: XposedModule, cl: ClassLoader) {

@@ -116,6 +116,7 @@ object MainMenuDialog {
         Prefs.reloadAsync()
         val items = listOf(
             Item("", "续火花") { showSpark(ctx) },
+            Item("", "增强功能") { showEnhanced(ctx) },
         )
         mark("buildItems")
         showSheet(ctx, "ManJiao", items, null)
@@ -311,8 +312,20 @@ object MainMenuDialog {
             toast(ctx, "测试发送 ok=$ok fail=$fail")
         })
 
-        body.addView(divider(ctx))
-        body.addView(sectTitle(ctx, "增强功能"))
+        showSheetCustom(ctx, "续火花", body, "保存", {
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_ENABLED, enabled)
+            Prefs.setStrSync(ctx, Prefs.K_SPARK_TARGETS, selected.joinToString(","))
+            Prefs.setStrSync(ctx, Prefs.K_SPARK_MESSAGE, message.text?.toString()?.trim().orEmpty())
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_SILENT, silent)
+            toast(ctx, "已保存")
+        }, { show(ctx) })
+    }
+
+    // ==================== 增强功能 ====================
+
+    private fun showEnhanced(ctx: Context) {
+        val body = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        body.addView(noteRow(ctx, "增强功能", "开关即时生效。"))
         body.addView(itemSwitchRow(ctx, "", "消息防撤回", Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true)) { nv ->
             Prefs.setBoolSync(ctx, Prefs.K_SPARK_ANTI_RECALL, nv)
         })
@@ -331,14 +344,7 @@ object MainMenuDialog {
         body.addView(itemSwitchRow(ctx, "", "真实计数", Prefs.bool(Prefs.K_SPARK_REAL_COUNT, false)) { nv ->
             Prefs.setBoolSync(ctx, Prefs.K_SPARK_REAL_COUNT, nv)
         })
-
-        showSheetCustom(ctx, "续火花", body, "保存", {
-            Prefs.setBoolSync(ctx, Prefs.K_SPARK_ENABLED, enabled)
-            Prefs.setStrSync(ctx, Prefs.K_SPARK_TARGETS, selected.joinToString(","))
-            Prefs.setStrSync(ctx, Prefs.K_SPARK_MESSAGE, message.text?.toString()?.trim().orEmpty())
-            Prefs.setBoolSync(ctx, Prefs.K_SPARK_SILENT, silent)
-            toast(ctx, "已保存")
-        }, { show(ctx) })
+        showSheetScroll(ctx, "增强功能", { show(ctx) }, body)
     }
 
     // ==================== 模块状态（2026-09-26 用户要求）====================

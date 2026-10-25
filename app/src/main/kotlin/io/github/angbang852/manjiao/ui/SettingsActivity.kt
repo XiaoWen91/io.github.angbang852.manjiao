@@ -437,6 +437,7 @@ class SettingsActivity : AppCompatActivity() {
         panel.addView(sectionLabel("快捷操作"))
         val actions = listOf(
             Item("🔥", "续火花", "目标好友 / 固定消息 / 静默发送") { showSpark() },
+            Item("⚙️", "增强功能", "防撤回 / 去水印 / 免已读 / 精确时间") { showEnhanced() },
             Item("🪟", "打开快手", "分享按钮 → 模块入口") { openModuleMenuHint() },
             Item("🌐", "项目仓库", "查看源码与更新日志") { openUrl(REPO_URL) },
             Item("💬", "问题反馈", "自动带上版本信息，无需手填") { openUrl(feedbackUrl()) },
@@ -1119,7 +1120,33 @@ class SettingsActivity : AppCompatActivity() {
         })
         panel.addView(space(8))
 
-        panel.addView(sectionLabel("增强功能"))
+        panel.addView(space(8))
+
+        panel.addView(itemRow(Item("💾", "保存续火花设置", "") {
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_ENABLED, enabled
+            )
+            io.github.angbang852.manjiao.data.Prefs.setStrSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_TARGETS,
+                selected.joinToString(",")
+            )
+            io.github.angbang852.manjiao.data.Prefs.setStrSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_MESSAGE,
+                message.text?.toString()?.trim().orEmpty()
+            )
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_SILENT, silent
+            )
+            android.widget.Toast.makeText(this, "已保存", android.widget.Toast.LENGTH_SHORT).show()
+        }))
+        jellyEnter(panel)
+    }
+
+    private fun showEnhanced() {
+        clearPanel()
+        panelRestorer = { showEnhanced() }
+        panel.addView(header("增强功能", true) { showMain() })
+        panel.addView(space(8))
         panel.addView(itemSwitchRow("", "消息防撤回", io.github.angbang852.manjiao.data.Prefs.bool(
             io.github.angbang852.manjiao.data.Prefs.K_SPARK_ANTI_RECALL, true
         )) { nv ->
@@ -1162,25 +1189,6 @@ class SettingsActivity : AppCompatActivity() {
                 this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_REAL_COUNT, nv
             )
         })
-        panel.addView(space(8))
-
-        panel.addView(itemRow(Item("💾", "保存续火花设置", "") {
-            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
-                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_ENABLED, enabled
-            )
-            io.github.angbang852.manjiao.data.Prefs.setStrSync(
-                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_TARGETS,
-                selected.joinToString(",")
-            )
-            io.github.angbang852.manjiao.data.Prefs.setStrSync(
-                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_MESSAGE,
-                message.text?.toString()?.trim().orEmpty()
-            )
-            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
-                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_SILENT, silent
-            )
-            android.widget.Toast.makeText(this, "已保存", android.widget.Toast.LENGTH_SHORT).show()
-        }))
         jellyEnter(panel)
     }
 
