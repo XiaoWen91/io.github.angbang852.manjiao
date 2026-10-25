@@ -2,6 +2,8 @@ package io.github.angbang852.manjiao.hook
 
 import android.content.Context
 import io.github.angbang852.manjiao.util.Logger
+import org.json.JSONObject
+import java.io.File
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.lang.reflect.Method
@@ -69,6 +71,7 @@ object SparkSender {
         return try {
             val msg = buildMessage(targetId.trim(), message, 5)
                 ?: return fail(onResult, "build_null")
+            applyTemplate(context, msg)
             val subBiz = readSubBiz(msg).ifEmpty { "0" }
             preSend(msg)
 
@@ -154,6 +157,62 @@ object SparkSender {
         }
     }
 
+    private fun applyTemplate(context: Context, msg: Any) {
+        try {
+            val f = File(context.filesDir, "ks_spark_msg_template.json")
+            if (!f.isFile || f.length() <= 0L) return
+            val json = JSONObject(f.readText())
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                if (key == "text" || key == "target" || key == "targetId" || key == "contentBytes") continue
+                setField(msg, key, json.opt(key))
+            }
+            Logger.d("spark_sender template applied fields=${json.length()}")
+        } catch (t: Throwable) {
+            Logger.d("spark_sender template fail: ${t.message}")
+        }
+    }
+
+    private fun setField(obj: Any, name: String, value: Any?) {
+        try {
+            val f = obj.javaClass.getDeclaredField(name)
+            f.isAccessible = true
+            f.set(obj, coerce(value, f.type))
+            return
+        } catch (_: Throwable) {
+        }
+        try {
+            val setter = "set" + name.replaceFirstChar { it.uppercase() }
+            for (m in obj.javaClass.methods) {
+                if (m.name == setter && m.parameterCount == 1) {
+                    m.invoke(obj, coerce(value, m.parameterTypes[0]))
+                    return
+                }
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun coerce(v: Any?, t: Class<*>): Any? {
+        if (v == null) return null
+        return try {
+            when {
+                t == String::class.java -> v.toString()
+                t == Int::class.javaPrimitiveType || t == java.lang.Integer::class.java ->
+                    (v as? Number)?.toInt() ?: v.toString().toIntOrNull() ?: 0
+                t == Long::class.javaPrimitiveType || t == java.lang.Long::class.java ->
+                    (v as? Number)?.toLong() ?: v.toString().toLongOrNull() ?: 0L
+                t == Boolean::class.javaPrimitiveType || t == java.lang.Boolean::class.java ->
+                    (v as? Boolean) ?: v.toString().toBoolean()
+                t == ByteArray::class.java -> v as? ByteArray
+                else -> v
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     private fun buildMessage(targetId: String, text: String, scene: Int): Any? {
         return try {
             ctorMsg?.newInstance(scene, targetId, text)
@@ -180,7 +239,8 @@ object SparkSender {
             val m = c.getDeclaredMethod("j", kwai, Int::class.javaPrimitiveType!!)
             m.isAccessible = true
             m.invoke(null, msg, 0)
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            Logger.d("spark_sender preSend skip: ${t.message}")
         }
     }
 
