@@ -161,7 +161,11 @@ object BeautifyUi {
             trackBg.setColor(if (on) colorOn else colorOff)
             lp.leftMargin = if (on) trackW - knobSize - pad else pad
             knob.layoutParams = lp
-            onToggle(on)
+            try {
+                onToggle(on)
+            } catch (t: Throwable) {
+                android.util.Log.e("BeautifyUi", "switch action failed", t)
+            }
         }
         return container
     }
@@ -353,7 +357,11 @@ object BeautifyUi {
                 isFocusable = true
                 setOnClickListener {
                     dialog.dismiss()
-                    onClick()
+                    try {
+                        onClick()
+                    } catch (t: Throwable) {
+                        android.util.Log.e("BeautifyUi", "dialog action failed", t)
+                    }
                 }
             })
         }

@@ -19,6 +19,7 @@ object BeautifyHooks {
     private val tabRoles = java.util.WeakHashMap<View, String>()
     private val uiRoots = java.util.WeakHashMap<View, String>()
     private val bottomViews = java.util.WeakHashMap<View, Boolean>()
+    private val bottomLp = java.util.WeakHashMap<View, ViewGroup.LayoutParams>()
     private val bottomContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val rightContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val pendantRoots = java.util.WeakHashMap<View, Boolean>()
@@ -36,11 +37,15 @@ object BeautifyHooks {
     }
 
     fun reapply() {
-        bottomViews.keys.toList().forEach { applyBottomView(it) }
-        bottomContainers.keys.toList().forEach { reorderBottom(it) }
-        rightContainers.keys.toList().forEach { applyRightContainer(it) }
-        pendantRoots.keys.toList().forEach { applyPendant(it) }
-        applyPlayAlpha(null)
+        try {
+            bottomViews.keys.toList().forEach { applyBottomView(it) }
+            bottomContainers.keys.toList().forEach { reorderBottom(it) }
+            rightContainers.keys.toList().forEach { applyRightContainer(it) }
+            pendantRoots.keys.toList().forEach { applyPendant(it) }
+            applyPlayAlpha(null)
+        } catch (t: Throwable) {
+            Logger.d("beauty reapply miss: ${t.message}")
+        }
     }
 
     private fun install(module: XposedModule, m: Method, id: String, hooker: XposedInterface.Hooker) {
@@ -115,16 +120,37 @@ object BeautifyHooks {
             } catch (_: Throwable) { null }
             val old = (gf?.get(self)?.toString() ?: tv?.text?.toString().orEmpty())
             val hide = hidden(Prefs.str(Prefs.K_BEAUTY_BOTTOM_HIDE, ""), old)
-            self.visibility = if (hide) View.GONE else View.VISIBLE
-            tv?.visibility = if (hide) View.GONE else View.VISIBLE
+            if (hide) {
+                if (!bottomLp.containsKey(self)) bottomLp[self] = self.layoutParams
+                self.visibility = View.GONE
+                val lp = self.layoutParams
+                if (lp is android.widget.LinearLayout.LayoutParams) {
+                    lp.width = 0
+                    lp.height = 0
+                    lp.weight = 0f
+                    self.layoutParams = lp
+                } else {
+                    self.layoutParams = ViewGroup.LayoutParams(0, 0)
+                }
+                tv?.visibility = View.GONE
+            } else {
+                self.visibility = View.VISIBLE
+                bottomLp.remove(self)?.let { self.layoutParams = it }
+                tv?.visibility = View.VISIBLE
+            }
             val repl = replace(Prefs.str(Prefs.K_BEAUTY_BOTTOM_TEXT, ""), old)
-            if (repl != old) {
+            if (!hide && repl != old) {
                 gf?.set(self, repl)
                 tv?.text = repl
             }
             if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
-                self.setBackgroundColor(Color.TRANSPARENT)
-                (self.parent as? View)?.setBackgroundColor(Color.TRANSPARENT)
+                var p: android.view.ViewParent? = self
+                var depth = 0
+                while (p is View && depth < 4) {
+                    p.setBackgroundColor(Color.TRANSPARENT)
+                    p = p.parent
+                    depth++
+                }
             }
         } catch (t: Throwable) {
             Logger.d("beauty bottom apply miss: ${t.message}")
@@ -149,7 +175,9 @@ object BeautifyHooks {
                     }
                     if (container != null && v != null) {
                         tabRoles[v] = role
-                        container.postDelayed({ reorderBottom(container) }, 350L)
+                        val parent = (v.parent as? ViewGroup) ?: container
+                        bottomContainers[parent] = true
+                        parent.postDelayed({ reorderBottom(parent) }, 350L)
                     }
                     r
                 }
@@ -220,19 +248,44 @@ object BeautifyHooks {
     }
 
     private fun applyRightContainer(ll: ViewGroup) {
+        if (ll.childCount < 2) return
         val hidden = Prefs.str(Prefs.K_BEAUTY_RIGHT_HIDE, "")
             .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        var matched = 0
         for (i in 0 until ll.childCount) {
             val child = ll.getChildAt(i)
             val label = labelOf(child)
-            if (hidden.any { label.contains(it) }) child.visibility = View.GONE else child.visibility = View.VISIBLE
+            if (hidden.any { label.contains(it) }) {
+                child.visibility = View.GONE
+                matched++
+            } else {
+                child.visibility = View.VISIBLE
+            }
         }
+        if (hidden.isNotEmpty() && matched == 0) {
+            val order = listOf("头像", "点赞", "评论", "收藏", "分享", "音乐")
+            for ((idx, name) in order.withIndex()) {
+                if (hidden.contains(name) && idx < ll.childCount) {
+                    ll.getChildAt(idx).visibility = View.GONE
+                }
+            }
+        }
+        if (ll.childCount < 4 || containsText(ll)) return
         uiRoots[ll] = "right"
         ll.translationX = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_X, "").toFloatOrNull() ?: 0f
         ll.translationY = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_Y, "").toFloatOrNull() ?: 0f
         val s = Prefs.str(Prefs.K_BEAUTY_RIGHT_SCALE, "").toFloatOrNull() ?: 1f
         ll.scaleX = s
         ll.scaleY = s
+    }
+
+    private fun containsText(group: ViewGroup): Boolean {
+        for (i in 0 until group.childCount) {
+            val c = group.getChildAt(i)
+            if (c is TextView && !c.text.isNullOrEmpty()) return true
+            if (c is ViewGroup && containsText(c)) return true
+        }
+        return false
     }
 
     private fun rightKey(label: String): String? = when {
@@ -317,13 +370,17 @@ object BeautifyHooks {
     }
 
     private fun applyPlayAlpha(observed: Float?) {
-        val playing = if (observed != null) observed < 0.99f else isPlaying()
-        val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
-        var raw = Prefs.str(key, "")
-        if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
-        val alpha = raw.toFloatOrNull()?.coerceIn(0f, 1f) ?: return
-        for (v in uiRoots.keys.toList()) {
-            if (v.isAttachedToWindow) v.alpha = alpha else uiRoots.remove(v)
+        try {
+            val playing = if (observed != null) observed < 0.99f else isPlaying()
+            val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
+            var raw = Prefs.str(key, "")
+            if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
+            val alpha = raw.toFloatOrNull()?.coerceIn(0f, 1f) ?: return
+            for (v in uiRoots.keys.toList()) {
+                if (v.isAttachedToWindow) v.alpha = alpha else uiRoots.remove(v)
+            }
+        } catch (t: Throwable) {
+            Logger.d("beauty play alpha apply miss: ${t.message}")
         }
     }
 
@@ -339,7 +396,15 @@ object BeautifyHooks {
         }
     }
 
-    private fun textOf(view: View): String = labelOf(view)
+    private fun textOf(view: View): String {
+        return try {
+            val f = view.javaClass.getDeclaredField("g")
+            f.isAccessible = true
+            f.get(view)?.toString().orEmpty()
+        } catch (_: Throwable) {
+            labelOf(view)
+        }
+    }
 
     private fun labelOf(view: View): String {
         val cd = view.contentDescription?.toString().orEmpty()
