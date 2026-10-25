@@ -1,9 +1,12 @@
 package io.github.angbang852.manjiao.hook
 
+import android.app.Activity
 import android.content.Context
+import android.os.Bundle
 import android.widget.TextView
 import io.github.angbang852.manjiao.data.Prefs
 import io.github.angbang852.manjiao.data.SparkContacts
+import io.github.angbang852.manjiao.ui.SparkSettingsEntry
 import io.github.angbang852.manjiao.util.Logger
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -16,8 +19,8 @@ import java.util.Locale
 /**
  * KsSpark 功能 Hook 层。
  *
- * 已落地：去开屏广告、免已读、精确时间（紧凑格式）、真实计数、
- * 时间不换行、好友列表采集。
+ * 只保留续火花相关能力：去开屏广告、免已读、精确时间（紧凑格式）、
+ * 真实计数、时间不换行、好友列表采集、设置页入口。
  */
 object SparkHooks {
     private val installed: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
@@ -29,6 +32,7 @@ object SparkHooks {
         hookRealCount(module, cl)
         hookTimeNoWrap(module, cl)
         hookContacts(module, cl)
+        hookSettingsEntry(module, cl)
     }
 
     fun selfTest(): String {
@@ -40,7 +44,8 @@ object SparkHooks {
             "spark.real_count",
             "spark.time_nowrap1",
             "spark.time_nowrap2",
-            "spark.contacts."
+            "spark.contacts.",
+            "spark.settings.entry"
         )
         val lines = expected.map { prefix ->
             val ok = installed.any { it == prefix || it.startsWith(prefix) }
@@ -191,30 +196,53 @@ object SparkHooks {
     }
 
     private fun hookContacts(module: XposedModule, cl: ClassLoader) {
+        val candidates = arrayOf(
+            "com.yxcorp.gifshow.message.next.conversation.children.list_content.children.single.f",
+            "com.yxcorp.gifshow.message.next.conversation.children.list_content.children.single.SingleConversationComponent"
+        )
+        for (cn in candidates) {
+            try {
+                val c = Class.forName(cn, false, cl)
+                var hooked = false
+                for (m in c.declaredMethods) {
+                    if (m.name == "g2") {
+                        val hasArg = m.parameterTypes.isNotEmpty()
+                        install(module, m, "spark.contacts.bind") { chain ->
+                            val arg = if (hasArg) chain.getArg(0) else chain.thisObject
+                            SparkContacts.noteBindTarget(arg)
+                            val r = chain.proceed()
+                            SparkContacts.noteBindFallbackName(chain.thisObject)
+                            r
+                        }
+                        hooked = true
+                    }
+                    if (m.name == "a" && m.parameterTypes.isNotEmpty()) {
+                        install(module, m, "spark.contacts.uistate") { chain ->
+                            SparkContacts.noteBindUiState(chain.getArg(0), chain.thisObject)
+                            chain.proceed()
+                        }
+                        hooked = true
+                    }
+                }
+                if (hooked) Logger.d("spark contacts hooked: $cn")
+            } catch (t: Throwable) {
+                Logger.d("spark contacts miss $cn: ${t.message}")
+            }
+        }
+    }
+
+    private fun hookSettingsEntry(module: XposedModule, cl: ClassLoader) {
         try {
-            val c = Class.forName(
-                "com.yxcorp.gifshow.message.next.conversation.children.list_content.children.single.f",
-                false,
-                cl
-            )
-            for (m in c.declaredMethods) {
-                if (m.name == "g2" && m.parameterTypes.isNotEmpty()) {
-                    install(module, m, "spark.contacts.bind") { chain ->
-                        SparkContacts.noteBindTarget(chain.getArg(0))
-                        val r = chain.proceed()
-                        SparkContacts.noteBindFallbackName(chain.thisObject)
-                        r
-                    }
-                }
-                if (m.name == "a" && m.parameterTypes.size == 1) {
-                    install(module, m, "spark.contacts.uistate") { chain ->
-                        SparkContacts.noteBindUiState(chain.getArg(0), chain.thisObject)
-                        chain.proceed()
-                    }
-                }
+            val c = Class.forName("com.yxcorp.plugin.setting.activity.SettingsActivity", false, cl)
+            val m = c.getDeclaredMethod("onCreate", Bundle::class.java)
+            install(module, m, "spark.settings.entry") { chain ->
+                val r = chain.proceed()
+                val self = chain.thisObject
+                if (self is Activity) SparkSettingsEntry.inject(self)
+                r
             }
         } catch (t: Throwable) {
-            Logger.d("spark contacts miss: ${t.message}")
+            Logger.d("spark settings entry miss: ${t.message}")
         }
     }
 

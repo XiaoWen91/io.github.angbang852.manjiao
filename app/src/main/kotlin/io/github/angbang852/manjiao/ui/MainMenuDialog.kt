@@ -115,20 +115,7 @@ object MainMenuDialog {
         // 文件兜底拉取后台化（原同步 FUSE 读 5-50ms 是点开菜单的掉帧源）
         Prefs.reloadAsync()
         val items = listOf(
-            Item("", "刷新内容", hasSub = false) { ContentFilterHook.refreshContent() },
             Item("", "续火花") { showSpark(ctx) },
-            Item("", "下载") { showDownload(ctx) },
-            Item("", "沉浸式页面") { showImmersive(ctx) },
-            Item("", "手势功能") { showGesture(ctx) },
-            Item("", "播放控制") { showPlayback(ctx) },
-            Item("", "内容过滤") { showFilter(ctx) },
-            // ★ 拦截审计（功能 4/5，2026-09）：与 app 菜单同步
-            Item("", "拦截记录") { showAuditRecords(ctx) },
-            Item("", "拦截统计") { showAuditStats(ctx) },
-            // ★★★ 模块状态（2026-09-26 用户要求）—— 集中查看各功能可用性
-            Item("", "模块状态") { showModuleStatus(ctx) },
-            Item("", "性能优化") { showPerf(ctx) },
-            Item("", "快手净化") { showPurify(ctx) },
         )
         mark("buildItems")
         showSheet(ctx, "ManJiao", items, null)
