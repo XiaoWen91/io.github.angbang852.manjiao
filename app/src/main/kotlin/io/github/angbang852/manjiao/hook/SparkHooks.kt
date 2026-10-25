@@ -204,7 +204,16 @@ object SparkHooks {
             try {
                 val c = Class.forName(cn, false, cl)
                 var hooked = false
-                for (m in c.declaredMethods) {
+                val methods = LinkedHashMap<String, Method>()
+                var cur: Class<*>? = c
+                while (cur != null && cur != Any::class.java) {
+                    for (m in cur.declaredMethods) {
+                        val key = m.name + "#" + m.parameterTypes.joinToString(",") { it.name }
+                        methods.putIfAbsent(key, m)
+                    }
+                    cur = cur.superclass
+                }
+                for (m in methods.values) {
                     if (m.name == "g2") {
                         val hasArg = m.parameterTypes.isNotEmpty()
                         install(module, m, "spark.contacts.bind") { chain ->

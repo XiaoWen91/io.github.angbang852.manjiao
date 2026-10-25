@@ -169,7 +169,7 @@ class Module : XposedModule {
                     //   false ⇒ 子进程（push_v3/messagesdk/kwv_sandboxed）也照常装全部 hook，
                     //   等于恢复「仅主进程注入」优化之前的行为（启动更慢/内存更高，见上方 :234 注释）。
                     Logger.once("boot.proc", "proc=$procName mainproc=" + Prefs.bool(Prefs.K_PERF_MAINPROC, false))
-                    if (Prefs.bool(Prefs.K_PERF_MAINPROC, false) && procName != null && procName.contains(':')) {
+                    if (procName != null && procName.contains(':')) {
                         Logger.once("boot.subproc", "skip sub process: $procName")
                         return@intercept null
                     }
@@ -231,6 +231,7 @@ class Module : XposedModule {
                     } catch (t: Throwable) {
                         diagWrite("recv=FAIL $t")
                     }
+                    Logger.safe("share") { SharePanelHook.hook(this, cl) }
                     Logger.safe("spark") { io.github.angbang852.manjiao.hook.SparkHooks.hook(this, cl) }
                     Logger.once("boot.installed", "INSTALLED: spark")
                 } catch (t: Throwable) {

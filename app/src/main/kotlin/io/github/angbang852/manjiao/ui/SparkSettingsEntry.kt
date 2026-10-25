@@ -31,20 +31,19 @@ object SparkSettingsEntry {
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(padH, padV, padH, padV)
-                setBackgroundColor(0x1AFFFFFF)
+                setBackgroundColor(0xEE1A1A1A.toInt())
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { MainMenuDialog.show(activity) }
             }
 
-            root.addView(
-                row,
-                0,
-                ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
+            val lp = android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
+            lp.gravity = Gravity.TOP
+            row.elevation = 20f * density
+            root.addView(row, lp)
             Logger.d("spark settings entry injected")
         } catch (t: Throwable) {
             Logger.d("spark settings entry failed: ${t.message}")
