@@ -457,6 +457,7 @@ class Module : XposedModule {
 
                     Logger.safe("perf") { PerfHook.hook(this, cl) }
                     Logger.safe("purify") { PurifyHook.hook(this, cl, ctx) }
+                    Logger.safe("spark") { io.github.angbang852.manjiao.hook.SparkHooks.hook(this, cl) }
                     // ★ E1 自检摘要：各 hook 的安装成败由各自 always 级标记输出
                     //（DLHOOK/PlaybackHook: hooked 等），此行确认主进程注入完成
                     Logger.once("boot.installed", "INSTALLED: anti/dl/share/imm/gold/flt/gs/pb/perf/purify")

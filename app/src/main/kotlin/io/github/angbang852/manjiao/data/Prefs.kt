@@ -38,6 +38,18 @@ object Prefs {
     private const val REMOTE_SP = "slowkick_remote"
 
     const val K_ANTI = "anti_detect"
+
+    // ==================== KsSpark 续火花 / 增强功能 ====================
+    const val K_SPARK_ENABLED = "spark_enabled"
+    const val K_SPARK_TARGETS = "spark_targets"
+    const val K_SPARK_MESSAGE = "spark_message"
+    const val K_SPARK_SILENT = "spark_silent"
+    const val K_SPARK_ANTI_RECALL = "spark_anti_recall"
+    const val K_SPARK_NO_WATERMARK = "spark_no_watermark"
+    const val K_SPARK_NO_SPLASH = "spark_no_splash"
+    const val K_SPARK_EXACT_TIME = "spark_exact_time"
+    const val K_SPARK_NO_READ = "spark_no_read"
+    const val K_SPARK_REAL_COUNT = "spark_real_count"
     const val K_DL_PATH = "dl_path"
     const val DEFAULT_PATH = "/sdcard/Download"
 

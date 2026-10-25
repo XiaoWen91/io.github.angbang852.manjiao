@@ -116,6 +116,7 @@ object MainMenuDialog {
         Prefs.reloadAsync()
         val items = listOf(
             Item("", "刷新内容", hasSub = false) { ContentFilterHook.refreshContent() },
+            Item("", "续火花") { showSpark(ctx) },
             Item("", "下载") { showDownload(ctx) },
             Item("", "沉浸式页面") { showImmersive(ctx) },
             Item("", "手势功能") { showGesture(ctx) },
@@ -133,6 +134,77 @@ object MainMenuDialog {
         showSheet(ctx, "ManJiao", items, null)
         mark("showSheetTotal")
         } finally { }
+    }
+
+    // ==================== 续火花（KsSpark 功能移植） ====================
+
+    private fun showSpark(ctx: Context) {
+        val body = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        body.addView(noteRow(ctx, "续火花", "每天打开快手后，自动给目标好友发送一条消息。"))
+
+        var enabled = Prefs.bool(Prefs.K_SPARK_ENABLED, false)
+        body.addView(itemSwitchRow(ctx, "", "启用续火花", enabled) { nv ->
+            enabled = nv
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_ENABLED, nv)
+        })
+
+        body.addView(divider(ctx))
+        body.addView(sectTitle(ctx, "目标好友"))
+        val targets = EditText(ctx).apply {
+            setText(Prefs.str(Prefs.K_SPARK_TARGETS, ""))
+            hint = "快手 ID，多个用逗号分隔"
+            setSingleLine(true)
+        }
+        body.addView(targets, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(dp(ctx, 20), dp(ctx, 6), dp(ctx, 20), dp(ctx, 6)) })
+
+        body.addView(sectTitle(ctx, "固定消息"))
+        val message = EditText(ctx).apply {
+            setText(Prefs.str(Prefs.K_SPARK_MESSAGE, ""))
+            hint = "留空则从一言分类随机取句"
+            setMinLines(2)
+        }
+        body.addView(message, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(dp(ctx, 20), dp(ctx, 6), dp(ctx, 20), dp(ctx, 6)) })
+
+        var silent = Prefs.bool(Prefs.K_SPARK_SILENT, true)
+        body.addView(itemSwitchRow(ctx, "", "静默发送", silent) { nv ->
+            silent = nv
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_SILENT, nv)
+        })
+
+        body.addView(divider(ctx))
+        body.addView(sectTitle(ctx, "增强功能"))
+        body.addView(itemSwitchRow(ctx, "", "消息防撤回", Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true)) { nv ->
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_ANTI_RECALL, nv)
+        })
+        body.addView(itemSwitchRow(ctx, "", "去水印", Prefs.bool(Prefs.K_SPARK_NO_WATERMARK, true)) { nv ->
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_NO_WATERMARK, nv)
+        })
+        body.addView(itemSwitchRow(ctx, "", "去开屏广告", Prefs.bool(Prefs.K_SPARK_NO_SPLASH, true)) { nv ->
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_NO_SPLASH, nv)
+        })
+        body.addView(itemSwitchRow(ctx, "", "精确时间", Prefs.bool(Prefs.K_SPARK_EXACT_TIME, false)) { nv ->
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_EXACT_TIME, nv)
+        })
+        body.addView(itemSwitchRow(ctx, "", "免已读", Prefs.bool(Prefs.K_SPARK_NO_READ, false)) { nv ->
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_NO_READ, nv)
+        })
+        body.addView(itemSwitchRow(ctx, "", "真实计数", Prefs.bool(Prefs.K_SPARK_REAL_COUNT, false)) { nv ->
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_REAL_COUNT, nv)
+        })
+
+        showSheetCustom(ctx, "续火花", body, "保存", {
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_ENABLED, enabled)
+            Prefs.setStrSync(ctx, Prefs.K_SPARK_TARGETS, targets.text?.toString()?.trim().orEmpty())
+            Prefs.setStrSync(ctx, Prefs.K_SPARK_MESSAGE, message.text?.toString()?.trim().orEmpty())
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_SILENT, silent)
+            toast(ctx, "已保存")
+        }, { show(ctx) })
     }
 
     // ==================== 模块状态（2026-09-26 用户要求）====================

@@ -436,6 +436,7 @@ class SettingsActivity : AppCompatActivity() {
         // ---- 操作区 ----
         panel.addView(sectionLabel("快捷操作"))
         val actions = listOf(
+            Item("🔥", "续火花", "目标好友 / 固定消息 / 静默发送") { showSpark() },
             Item("🪟", "打开快手", "分享按钮 → 模块入口") { openModuleMenuHint() },
             Item("🌐", "项目仓库", "查看源码与更新日志") { openUrl(REPO_URL) },
             Item("💬", "问题反馈", "自动带上版本信息，无需手填") { openUrl(feedbackUrl()) },
@@ -931,6 +932,125 @@ class SettingsActivity : AppCompatActivity() {
      * 导致「一处修了另一处没修」。现统一收敛到 AuditViz（与类别色板同源）。
      */
     private fun ruleLabel(reason: String): String = AuditViz.ruleLabel(reason)
+
+    private fun showSpark() {
+        clearPanel()
+        panelRestorer = { showSpark() }
+        panel.addView(header("续火花", true) { showMain() })
+
+        panel.addView(sectionLabel("续火花"))
+        var enabled = io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_ENABLED, false
+        )
+        panel.addView(itemSwitchRow("", "启用续火花", enabled) { nv ->
+            enabled = nv
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_ENABLED, nv
+            )
+        })
+        panel.addView(space(8))
+
+        panel.addView(sectionLabel("目标好友"))
+        val targets = android.widget.EditText(this).apply {
+            setText(io.github.angbang852.manjiao.data.Prefs.str(
+                io.github.angbang852.manjiao.data.Prefs.K_SPARK_TARGETS, ""
+            ))
+            hint = "快手 ID，多个用逗号分隔"
+            setSingleLine(true)
+        }
+        panel.addView(targets, android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(dp(14), dp(6), dp(14), dp(6)) })
+
+        panel.addView(sectionLabel("固定消息"))
+        val message = android.widget.EditText(this).apply {
+            setText(io.github.angbang852.manjiao.data.Prefs.str(
+                io.github.angbang852.manjiao.data.Prefs.K_SPARK_MESSAGE, ""
+            ))
+            hint = "留空则从一言分类随机取句"
+            setMinLines(2)
+        }
+        panel.addView(message, android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(dp(14), dp(6), dp(14), dp(6)) })
+
+        var silent = io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_SILENT, true
+        )
+        panel.addView(itemSwitchRow("", "静默发送", silent) { nv ->
+            silent = nv
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_SILENT, nv
+            )
+        })
+        panel.addView(space(8))
+
+        panel.addView(sectionLabel("增强功能"))
+        panel.addView(itemSwitchRow("", "消息防撤回", io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_ANTI_RECALL, true
+        )) { nv ->
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_ANTI_RECALL, nv
+            )
+        })
+        panel.addView(itemSwitchRow("", "去水印", io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_NO_WATERMARK, true
+        )) { nv ->
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_NO_WATERMARK, nv
+            )
+        })
+        panel.addView(itemSwitchRow("", "去开屏广告", io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_NO_SPLASH, true
+        )) { nv ->
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_NO_SPLASH, nv
+            )
+        })
+        panel.addView(itemSwitchRow("", "精确时间", io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_EXACT_TIME, false
+        )) { nv ->
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_EXACT_TIME, nv
+            )
+        })
+        panel.addView(itemSwitchRow("", "免已读", io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_NO_READ, false
+        )) { nv ->
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_NO_READ, nv
+            )
+        })
+        panel.addView(itemSwitchRow("", "真实计数", io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_REAL_COUNT, false
+        )) { nv ->
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_REAL_COUNT, nv
+            )
+        })
+        panel.addView(space(8))
+
+        panel.addView(itemRow(Item("💾", "保存续火花设置", "") {
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_ENABLED, enabled
+            )
+            io.github.angbang852.manjiao.data.Prefs.setStrSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_TARGETS,
+                targets.text?.toString()?.trim().orEmpty()
+            )
+            io.github.angbang852.manjiao.data.Prefs.setStrSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_MESSAGE,
+                message.text?.toString()?.trim().orEmpty()
+            )
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_SILENT, silent
+            )
+            android.widget.Toast.makeText(this, "已保存", android.widget.Toast.LENGTH_SHORT).show()
+        }))
+        jellyEnter(panel)
+    }
 
     private fun showGesture() {
         onMainPage = false
