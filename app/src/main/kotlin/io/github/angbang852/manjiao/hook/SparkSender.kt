@@ -115,7 +115,7 @@ object SparkSender {
                 cKwaiMsg = Class.forName(CLS_KWAI_MSG, false, cl)
                 cTextMsg = Class.forName(CLS_TEXT_MSG, false, cl)
                 ctorMsg = cTextMsg?.getConstructor(
-                    Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType!!,
                     String::class.java,
                     String::class.java
                 )
@@ -175,7 +175,8 @@ object SparkSender {
         try {
             val cl = loader ?: return
             val c = Class.forName("sej.w", false, cl)
-            val m = c.getDeclaredMethod("j", cKwaiMsg, Int::class.javaPrimitiveType)
+            val kwai = cKwaiMsg ?: return
+            val m = c.getDeclaredMethod("j", kwai, Int::class.javaPrimitiveType!!)
             m.isAccessible = true
             m.invoke(null, msg, 0)
         } catch (_: Throwable) {
