@@ -227,9 +227,26 @@ object SparkHooks {
                 val res = chain.proceed()
                 if (Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true) && res != null) {
                     try {
+                        val self = chain.thisObject
+                        val origin = self?.javaClass?.getMethod("getOriginMsg")?.invoke(self)
+                        var sender = ""
+                        if (origin != null) {
+                            for (n in arrayOf("getSender", "getSenderId", "getFrom")) {
+                                try {
+                                    val v = origin.javaClass.getMethod(n).invoke(origin)
+                                    if (v is String && v.isNotEmpty()) {
+                                        sender = v
+                                        break
+                                    }
+                                } catch (_: Throwable) {
+                                }
+                            }
+                        }
+                        val name = if (sender.isNotEmpty()) SparkContacts.nameOf(sender) else ""
+                        val text = if (name.isNotEmpty()) "$name 撤回了一条消息" else "这条消息已撤回"
                         val f = res.javaClass.getDeclaredField("b")
                         f.isAccessible = true
-                        f.set(res, "这条消息已撤回")
+                        f.set(res, text)
                     } catch (_: Throwable) {
                     }
                 }
@@ -251,10 +268,14 @@ object SparkHooks {
                                 if (origin != null) {
                                     val text = origin.javaClass.getMethod("getText").invoke(origin) as? String
                                     val self = chain.thisObject
-                                    if (!text.isNullOrEmpty() && self != null) {
+                                    if (self != null) {
                                         val f = self.javaClass.getDeclaredField("A")
                                         f.isAccessible = true
-                                        (f.get(self) as? TextView)?.text = text
+                                        val tv = f.get(self) as? TextView
+                                        if (tv != null) {
+                                            if (!text.isNullOrEmpty()) tv.text = text
+                                            SparkRecallMedia.attach(tv, origin)
+                                        }
                                     }
                                 }
                             } catch (_: Throwable) {

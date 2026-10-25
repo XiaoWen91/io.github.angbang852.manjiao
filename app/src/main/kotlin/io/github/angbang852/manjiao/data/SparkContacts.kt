@@ -67,6 +67,11 @@ object SparkContacts {
         return map.values.sortedBy { it.name.ifEmpty { it.id } }
     }
 
+    fun nameOf(id: String): String {
+        ensureLoaded()
+        return map[id]?.name ?: ""
+    }
+
     fun noteBindTarget(obj: Any?) {
         val id = readString(obj, "h")
         if (id.isEmpty()) return
