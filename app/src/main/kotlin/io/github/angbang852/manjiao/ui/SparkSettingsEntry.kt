@@ -41,7 +41,11 @@ object SparkSettingsEntry {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+            val statusBarId = activity.resources.getIdentifier("status_bar_height", "dimen", "android")
+            val statusBarH = if (statusBarId > 0) activity.resources.getDimensionPixelSize(statusBarId) else 0
+            val actionBarH = activity.actionBar?.height ?: (56 * density).toInt()
             lp.gravity = Gravity.TOP
+            lp.topMargin = statusBarH + actionBarH
             row.elevation = 20f * density
             root.addView(row, lp)
             Logger.d("spark settings entry injected")
