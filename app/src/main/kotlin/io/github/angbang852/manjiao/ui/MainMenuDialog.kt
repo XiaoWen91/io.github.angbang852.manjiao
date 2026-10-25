@@ -139,19 +139,137 @@ object MainMenuDialog {
         body.addView(sectTitle(ctx, "目标好友"))
         val selected = io.github.angbang852.manjiao.data.SparkContacts.selectedIds()
         val contacts = io.github.angbang852.manjiao.data.SparkContacts.all()
+
+        fun loadSparkAvatar(url: String, iv: android.widget.ImageView) {
+            Thread {
+                try {
+                    val conn = java.net.URL(url).openConnection()
+                    conn.connectTimeout = 5000
+                    conn.readTimeout = 5000
+                    val bmp = android.graphics.BitmapFactory.decodeStream(conn.getInputStream())
+                    if (bmp != null) {
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            iv.setImageBitmap(bmp)
+                            iv.visibility = View.VISIBLE
+                        }
+                    }
+                } catch (_: Throwable) {
+                }
+            }.start()
+        }
+
+        fun sparkRow(c: io.github.angbang852.manjiao.data.SparkContacts.Contact): View {
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(ctx, 14), dp(ctx, 8), dp(ctx, 14), dp(ctx, 8))
+                isClickable = true
+                isFocusable = true
+            }
+            var checked = selected.contains(c.id)
+
+            fun paintRow() {
+                row.background = GradientDrawable().apply {
+                    cornerRadius = dp(ctx, 14).toFloat()
+                    setColor(if (checked) 0x22FF6600 else 0x12FFFFFF)
+                    if (checked) setStroke(dp(ctx, 1), 0x55FF6600)
+                }
+            }
+
+            paintRow()
+
+            val avatarBox = FrameLayout(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(ctx, 40), dp(ctx, 40))
+            }
+            val initial = TextView(ctx).apply {
+                text = c.name.ifEmpty { c.id }.take(1)
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                textSize = 16f
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(0x33FF6600)
+                }
+            }
+            avatarBox.addView(initial, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+
+            val avatar = android.widget.ImageView(ctx).apply {
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                visibility = View.GONE
+                clipToOutline = true
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(0xFF2A2A2A.toInt())
+                }
+            }
+            avatarBox.addView(avatar, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            if (c.avatar.isNotEmpty()) {
+                avatar.visibility = View.VISIBLE
+                loadSparkAvatar(c.avatar, avatar)
+            }
+            row.addView(avatarBox)
+
+            val textCol = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(ctx, 12), 0, 0, 0)
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            textCol.addView(TextView(ctx).apply {
+                text = c.name.ifEmpty { c.id }
+                setTextColor(Color.WHITE)
+                textSize = 15f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            })
+            textCol.addView(TextView(ctx).apply {
+                text = c.id
+                setTextColor(0x80FFFFFF.toInt())
+                textSize = 11f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            row.addView(textCol)
+
+            val check = TextView(ctx).apply {
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                layoutParams = LinearLayout.LayoutParams(dp(ctx, 24), dp(ctx, 24))
+            }
+
+            fun paintCheck() {
+                check.text = if (checked) "✓" else ""
+                check.background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(if (checked) 0xFFFF6600.toInt() else 0x1AFFFFFF)
+                }
+            }
+
+            paintCheck()
+            row.addView(check)
+
+            row.setOnClickListener {
+                checked = !checked
+                if (checked) selected.add(c.id) else selected.remove(c.id)
+                paintRow()
+                paintCheck()
+            }
+            return row
+        }
+
         if (contacts.isEmpty()) {
             body.addView(noteRow(ctx, "暂无好友", "先在快手聊天页打开几个会话，再回来刷新"))
         } else {
             for (c in contacts.take(80)) {
-                val cb = CheckBox(ctx).apply {
-                    text = c.name.ifEmpty { c.id }
-                    isChecked = selected.contains(c.id)
-                    setPadding(dp(ctx, 20), dp(ctx, 4), dp(ctx, 20), dp(ctx, 4))
-                }
-                cb.setOnCheckedChangeListener { _, checked ->
-                    if (checked) selected.add(c.id) else selected.remove(c.id)
-                }
-                body.addView(cb)
+                body.addView(sparkRow(c), LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(dp(ctx, 12), dp(ctx, 2), dp(ctx, 12), dp(ctx, 2)) })
             }
         }
         body.addView(buttonRow(ctx, "刷新好友列表") { showSpark(ctx) })
