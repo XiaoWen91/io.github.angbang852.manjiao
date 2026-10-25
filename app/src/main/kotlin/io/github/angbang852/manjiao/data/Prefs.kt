@@ -71,6 +71,9 @@ object Prefs {
     const val K_BEAUTY_ALPHA_PAUSED = "beauty_alpha_paused"
     const val K_BEAUTY_NO_FULLSCREEN = "beauty_no_fullscreen"
     const val K_BEAUTY_NO_COIN = "beauty_no_coin"
+    const val K_BEAUTY_FORCE_TIME = "beauty_force_time"
+    const val K_BEAUTY_TIME_SECONDS = "beauty_time_seconds"
+    const val K_BEAUTY_FORCE_IP = "beauty_force_ip"
     const val K_DL_PATH = "dl_path"
     const val DEFAULT_PATH = "/sdcard/Download"
 

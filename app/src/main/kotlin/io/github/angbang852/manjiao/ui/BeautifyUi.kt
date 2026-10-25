@@ -59,6 +59,11 @@ object BeautifyUi {
         })
         root.addView(row(ctx, "修改偏移 / 缩放", "整体") { rightOffsetDialog(ctx) })
 
+        root.addView(section(ctx, "文案信息"))
+        root.addView(toggleRow(ctx, "强制显示发布时间", Prefs.K_BEAUTY_FORCE_TIME, false))
+        root.addView(toggleRow(ctx, "时间精确到秒", Prefs.K_BEAUTY_TIME_SECONDS, true))
+        root.addView(toggleRow(ctx, "强制显示 IP 属地", Prefs.K_BEAUTY_FORCE_IP, false))
+
         root.addView(section(ctx, "播放 UI"))
         root.addView(row(ctx, "播放/暂停 UI 透明度", alphaSummary(ctx)) { alphaDialog(ctx) })
         root.addView(toggleRow(ctx, "去除全屏观看按钮", Prefs.K_BEAUTY_NO_FULLSCREEN, false))

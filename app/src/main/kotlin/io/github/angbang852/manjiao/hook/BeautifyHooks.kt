@@ -33,6 +33,7 @@ object BeautifyHooks {
         hookRightActionBar(module, cl)
         hookPendant(module, cl)
         hookFullscreen(module, cl)
+        hookCaptionInfo(module, cl)
         hookPlaybackAlpha(module, cl)
     }
 
@@ -123,6 +124,9 @@ object BeautifyHooks {
             if (hide) {
                 if (!bottomLp.containsKey(self)) bottomLp[self] = self.layoutParams
                 self.visibility = View.GONE
+                self.isClickable = false
+                self.isFocusable = false
+                self.isEnabled = false
                 val lp = self.layoutParams
                 if (lp is android.widget.LinearLayout.LayoutParams) {
                     lp.width = 0
@@ -135,6 +139,9 @@ object BeautifyHooks {
                 tv?.visibility = View.GONE
             } else {
                 self.visibility = View.VISIBLE
+                self.isClickable = true
+                self.isFocusable = true
+                self.isEnabled = true
                 bottomLp.remove(self)?.let { self.layoutParams = it }
                 tv?.visibility = View.VISIBLE
             }
@@ -144,11 +151,11 @@ object BeautifyHooks {
                 tv?.text = repl
             }
             if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false)) {
-                self.setBackgroundColor(Color.TRANSPARENT)
+                self.background = null
                 var p: View? = self.parent as? View
                 var depth = 1
-                while (p != null && depth < 4) {
-                    p.setBackgroundColor(Color.TRANSPARENT)
+                while (p != null && depth < 6) {
+                    p.background = null
                     p = p.parent as? View
                     depth++
                 }
@@ -264,14 +271,14 @@ object BeautifyHooks {
             }
         }
         if (hidden.isNotEmpty() && matched == 0) {
-            val order = listOf("头像", "点赞", "评论", "收藏", "分享", "音乐")
+            val order = listOf("头像", "点赞", "评论", "收藏", "音乐", "分享")
             for ((idx, name) in order.withIndex()) {
                 if (hidden.contains(name) && idx < ll.childCount) {
                     ll.getChildAt(idx).visibility = View.GONE
                 }
             }
         }
-        if (ll.childCount < 4 || containsText(ll)) return
+        if (ll.childCount < 4) return
         uiRoots[ll] = "right"
         ll.translationX = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_X, "").toFloatOrNull() ?: 0f
         ll.translationY = Prefs.str(Prefs.K_BEAUTY_RIGHT_OFFSET_Y, "").toFloatOrNull() ?: 0f
@@ -338,6 +345,59 @@ object BeautifyHooks {
         }
     }
 
+    private fun hookCaptionInfo(module: XposedModule, cl: ClassLoader) {
+        try {
+            val c = Class.forName("u9b.a", false, cl)
+            val m = c.declaredMethods.firstOrNull { it.name == "c" && it.parameterCount == 5 }
+            if (m == null) return
+            install(module, m, "beauty.caption.info") { chain ->
+                val r = chain.proceed()
+                val photo = chain.getArg(0)
+                if (photo == null) return@install r
+                val extra = ArrayList<String>()
+                if (Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false)) {
+                    val ts = callLong(photo, "getKCreatedTime")
+                    if (ts > 0L) extra.add(formatTimestamp(ts, Prefs.bool(Prefs.K_BEAUTY_TIME_SECONDS, true)))
+                }
+                if (Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) {
+                    val ip = callString(photo, "getCaptionIpLocation")
+                    if (ip.isNotBlank()) extra.add(ip)
+                }
+                if (extra.isEmpty()) return@install r
+                val old = (r as? String).orEmpty()
+                val add = extra.filter { old.isBlank() || !old.contains(it) }.joinToString("  ")
+                if (add.isBlank()) r else if (old.isBlank()) add else "$old  $add"
+            }
+        } catch (t: Throwable) {
+            Logger.d("beauty caption info miss: ${t.message}")
+        }
+    }
+
+    private fun callString(obj: Any, name: String): String {
+        return try {
+            val m = obj.javaClass.getMethod(name)
+            m.isAccessible = true
+            m.invoke(obj)?.toString().orEmpty()
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
+    private fun callLong(obj: Any, name: String): Long {
+        return try {
+            val m = obj.javaClass.getMethod(name)
+            m.isAccessible = true
+            (m.invoke(obj) as? Number)?.toLong() ?: 0L
+        } catch (_: Throwable) {
+            0L
+        }
+    }
+
+    private fun formatTimestamp(ts: Long, seconds: Boolean): String {
+        val pattern = if (seconds) "yyyy-MM-dd HH:mm:ss" else "yyyy-MM-dd HH:mm"
+        return java.text.SimpleDateFormat(pattern, java.util.Locale.US).format(java.util.Date(ts))
+    }
+
     private fun hookPlaybackAlpha(module: XposedModule, cl: ClassLoader) {
         try {
             val j2 = Class.forName("t6h.j2", false, cl)
@@ -372,7 +432,7 @@ object BeautifyHooks {
 
     private fun applyPlayAlpha(observed: Float?) {
         try {
-            val playing = if (observed != null) observed < 0.99f else isPlaying()
+            val playing = isPlaying()
             val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
             var raw = Prefs.str(key, "")
             if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
