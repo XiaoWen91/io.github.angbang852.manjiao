@@ -264,19 +264,31 @@ object SparkHooks {
                         if (Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true)) {
                             try {
                                 val msg = chain.getArg(0)
-                                val origin = msg?.javaClass?.getMethod("getOriginMsg")?.invoke(msg)
+                                val holder = chain.getArg(1)
+                                val origin = try {
+                                    msg?.javaClass?.getMethod("getOriginMsg")?.invoke(msg)
+                                } catch (_: Throwable) {
+                                    null
+                                }
+                                var text = ""
                                 if (origin != null) {
-                                    val text = origin.javaClass.getMethod("getText").invoke(origin) as? String
-                                    val self = chain.thisObject
-                                    if (self != null) {
-                                        val f = self.javaClass.getDeclaredField("A")
-                                        f.isAccessible = true
-                                        val tv = f.get(self) as? TextView
-                                        if (tv != null) {
-                                            if (!text.isNullOrEmpty()) tv.text = text
-                                            SparkRecallMedia.attach(tv, origin)
+                                    text = try {
+                                        origin.javaClass.getMethod("getText").invoke(origin) as? String ?: ""
+                                    } catch (_: Throwable) {
+                                        ""
+                                    }
+                                    if (text.isEmpty()) {
+                                        text = try {
+                                            origin.javaClass.getMethod("getSummary").invoke(origin) as? String ?: ""
+                                        } catch (_: Throwable) {
+                                            ""
                                         }
                                     }
+                                }
+                                val tv = findBubbleText(chain.thisObject, holder)
+                                if (tv != null) {
+                                    tv.text = if (text.isNotEmpty()) text else "这条消息已撤回"
+                                    if (origin != null) SparkRecallMedia.attach(tv, origin)
                                 }
                             } catch (_: Throwable) {
                             }
@@ -445,6 +457,33 @@ object SparkHooks {
         } catch (t: Throwable) {
             Logger.d("spark settings entry miss: ${t.message}")
         }
+    }
+
+    private fun findBubbleText(presenter: Any?, holder: Any?): TextView? {
+        if (presenter != null) {
+            try {
+                val f = presenter.javaClass.getDeclaredField("A")
+                f.isAccessible = true
+                val v = f.get(presenter)
+                if (v is TextView) return v
+            } catch (_: Throwable) {
+            }
+        }
+        val obj = holder ?: return null
+        var c: Class<*>? = obj.javaClass
+        while (c != null && c != Any::class.java) {
+            for (f in c.declaredFields) {
+                if (!TextView::class.java.isAssignableFrom(f.type)) continue
+                try {
+                    f.isAccessible = true
+                    val v = f.get(obj)
+                    if (v is TextView) return v
+                } catch (_: Throwable) {
+                }
+            }
+            c = c.superclass
+        }
+        return null
     }
 
     private fun formatTime(ts: Long): String {
