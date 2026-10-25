@@ -42,6 +42,7 @@ object Prefs {
     // ==================== KsSpark 续火花 / 增强功能 ====================
     const val K_SPARK_ENABLED = "spark_enabled"
     const val K_SPARK_TARGETS = "spark_targets"
+    const val K_SPARK_CONTACTS = "spark_contacts"
     const val K_SPARK_MESSAGE = "spark_message"
     const val K_SPARK_SILENT = "spark_silent"
     const val K_SPARK_ANTI_RECALL = "spark_anti_recall"

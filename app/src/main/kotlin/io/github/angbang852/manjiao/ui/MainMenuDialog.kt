@@ -140,7 +140,7 @@ object MainMenuDialog {
 
     private fun showSpark(ctx: Context) {
         val body = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-        body.addView(noteRow(ctx, "续火花", "每天打开快手后，自动给目标好友发送一条消息。"))
+        body.addView(noteRow(ctx, "续火花", "每天打开快手后，自动给勾选的好友发送一条消息。"))
 
         var enabled = Prefs.bool(Prefs.K_SPARK_ENABLED, false)
         body.addView(itemSwitchRow(ctx, "", "启用续火花", enabled) { nv ->
@@ -150,16 +150,27 @@ object MainMenuDialog {
 
         body.addView(divider(ctx))
         body.addView(sectTitle(ctx, "目标好友"))
-        val targets = EditText(ctx).apply {
-            setText(Prefs.str(Prefs.K_SPARK_TARGETS, ""))
-            hint = "快手 ID，多个用逗号分隔"
-            setSingleLine(true)
+        val selected = io.github.angbang852.manjiao.data.SparkContacts.selectedIds()
+        val contacts = io.github.angbang852.manjiao.data.SparkContacts.all()
+        if (contacts.isEmpty()) {
+            body.addView(noteRow(ctx, "暂无好友", "先在快手聊天页打开几个会话，再回来刷新"))
+        } else {
+            for (c in contacts.take(80)) {
+                val cb = CheckBox(ctx).apply {
+                    text = c.name.ifEmpty { c.id }
+                    isChecked = selected.contains(c.id)
+                    setPadding(dp(ctx, 20), dp(ctx, 4), dp(ctx, 20), dp(ctx, 4))
+                }
+                cb.setOnCheckedChangeListener { _, checked ->
+                    if (checked) selected.add(c.id) else selected.remove(c.id)
+                }
+                body.addView(cb)
+            }
         }
-        body.addView(targets, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { setMargins(dp(ctx, 20), dp(ctx, 6), dp(ctx, 20), dp(ctx, 6)) })
+        body.addView(buttonRow(ctx, "刷新好友列表") { showSpark(ctx) })
+        body.addView(buttonRow(ctx, "测试功能") { toast(ctx, io.github.angbang852.manjiao.hook.SparkHooks.selfTest()) })
 
+        body.addView(divider(ctx))
         body.addView(sectTitle(ctx, "固定消息"))
         val message = EditText(ctx).apply {
             setText(Prefs.str(Prefs.K_SPARK_MESSAGE, ""))
@@ -200,7 +211,7 @@ object MainMenuDialog {
 
         showSheetCustom(ctx, "续火花", body, "保存", {
             Prefs.setBoolSync(ctx, Prefs.K_SPARK_ENABLED, enabled)
-            Prefs.setStrSync(ctx, Prefs.K_SPARK_TARGETS, targets.text?.toString()?.trim().orEmpty())
+            Prefs.setStrSync(ctx, Prefs.K_SPARK_TARGETS, selected.joinToString(","))
             Prefs.setStrSync(ctx, Prefs.K_SPARK_MESSAGE, message.text?.toString()?.trim().orEmpty())
             Prefs.setBoolSync(ctx, Prefs.K_SPARK_SILENT, silent)
             toast(ctx, "已保存")

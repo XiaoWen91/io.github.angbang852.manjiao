@@ -951,17 +951,31 @@ class SettingsActivity : AppCompatActivity() {
         panel.addView(space(8))
 
         panel.addView(sectionLabel("目标好友"))
-        val targets = android.widget.EditText(this).apply {
-            setText(io.github.angbang852.manjiao.data.Prefs.str(
-                io.github.angbang852.manjiao.data.Prefs.K_SPARK_TARGETS, ""
-            ))
-            hint = "快手 ID，多个用逗号分隔"
-            setSingleLine(true)
+        val selected = io.github.angbang852.manjiao.data.SparkContacts.selectedIds()
+        val contacts = io.github.angbang852.manjiao.data.SparkContacts.all()
+        if (contacts.isEmpty()) {
+            panel.addView(itemRow(Item("👥", "暂无好友", "先在快手聊天页打开几个会话，再回来刷新") { }))
+        } else {
+            for (c in contacts.take(80)) {
+                val cb = android.widget.CheckBox(this).apply {
+                    text = c.name.ifEmpty { c.id }
+                    isChecked = selected.contains(c.id)
+                    setPadding(dp(14), dp(4), dp(14), dp(4))
+                }
+                cb.setOnCheckedChangeListener { _, checked ->
+                    if (checked) selected.add(c.id) else selected.remove(c.id)
+                }
+                panel.addView(cb)
+            }
         }
-        panel.addView(targets, android.widget.LinearLayout.LayoutParams(
-            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { setMargins(dp(14), dp(6), dp(14), dp(6)) })
+        panel.addView(itemRow(Item("🔄", "刷新好友列表", "") { showSpark() }))
+        panel.addView(itemRow(Item("🧪", "测试功能", "") {
+            android.widget.Toast.makeText(
+                this,
+                io.github.angbang852.manjiao.hook.SparkHooks.selfTest(),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }))
 
         panel.addView(sectionLabel("固定消息"))
         val message = android.widget.EditText(this).apply {
@@ -1038,7 +1052,7 @@ class SettingsActivity : AppCompatActivity() {
             )
             io.github.angbang852.manjiao.data.Prefs.setStrSync(
                 this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_TARGETS,
-                targets.text?.toString()?.trim().orEmpty()
+                selected.joinToString(",")
             )
             io.github.angbang852.manjiao.data.Prefs.setStrSync(
                 this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_MESSAGE,
