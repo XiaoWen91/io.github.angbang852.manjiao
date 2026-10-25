@@ -33,6 +33,12 @@ android {
         if (f.exists()) f.reader(Charsets.UTF_8).use { load(it) }
     }
     signingConfigs {
+        create("fixedDebug") {
+            storeFile = file("kspark-debug.keystore")
+            storePassword = "kspark123"
+            keyAlias = "kspark"
+            keyPassword = "kspark123"
+        }
         create("release") {
             val sf = signingProps.getProperty("manjiao.storeFile") ?: ""
             if (sf.isNotEmpty() && file(sf).exists()) {
@@ -44,6 +50,9 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("fixedDebug")
+        }
         release {
             // ★ R8 开启：Xposed 模块按名反射点已由 proguard-rules.pro 保护
             //（Module 入口 / libxposed API / JNI native 方法）

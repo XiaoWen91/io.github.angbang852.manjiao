@@ -293,6 +293,24 @@ object MainMenuDialog {
             Prefs.setBoolSync(ctx, Prefs.K_SPARK_SILENT, nv)
         })
 
+        body.addView(buttonRow(ctx, "测试续火花") {
+            val ids = selected.toList()
+            if (ids.isEmpty()) {
+                toast(ctx, "先勾选好友")
+                return@buttonRow
+            }
+            val msg = message.text?.toString()?.trim().orEmpty().ifEmpty { "测试续火花" }
+            var ok = 0
+            var fail = 0
+            for (id in ids) {
+                val sent = io.github.angbang852.manjiao.hook.SparkSender.send(ctx, id, msg) { success, reason ->
+                    if (!success) Logger.d("spark test fail id=$id reason=$reason")
+                }
+                if (sent) ok++ else fail++
+            }
+            toast(ctx, "测试发送 ok=$ok fail=$fail")
+        })
+
         body.addView(divider(ctx))
         body.addView(sectTitle(ctx, "增强功能"))
         body.addView(itemSwitchRow(ctx, "", "消息防撤回", Prefs.bool(Prefs.K_SPARK_ANTI_RECALL, true)) { nv ->

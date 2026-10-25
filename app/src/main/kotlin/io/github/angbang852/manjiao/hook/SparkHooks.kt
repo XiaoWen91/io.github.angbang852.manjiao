@@ -26,6 +26,7 @@ object SparkHooks {
     private val installed: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     fun hook(module: XposedModule, cl: ClassLoader) {
+        SparkSender.attach(cl)
         hookNoSplash(module, cl)
         hookNoRead(module, cl)
         hookExactTime(module, cl)
