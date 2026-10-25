@@ -3,28 +3,57 @@ package io.github.angbang852.manjiao.hook
 import android.content.Context
 import io.github.angbang852.manjiao.util.Logger
 import java.lang.reflect.Constructor
+import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
 /**
- * 测试续火花用的静默发送器。
+ * 对齐原 KsSpark SilentSender 的静默发送器。
  *
- * 只做一件事：按快手 IM SDK 的常见形状构造文本消息并调用 Sender。
- * 成功与否通过返回值和回调给出，不做每日守卫、不写状态文件。
+ * 主路径：
+ *   TextMsg(int, target, text)
+ *   -> IMClients.of(subBiz)
+ *   -> client.k() -> manager
+ *   -> manager.send([conversation], null, null)
+ *
+ * 不再使用 jfj.b3 / jfj.f2 旧兜底。
  */
 object SparkSender {
+    private const val CLS_KWAI_MSG = "com.kwai.imsdk.msg.KwaiMsg"
+    private const val CLS_TEXT_MSG = "com.kwai.imsdk.msg.TextMsg"
+    private const val CLS_KMP_CLIENTS = "com.kwai.kmp.imsdk.client.IMClients"
+
+    private val KMP_CONVERTER_CANDIDATES = arrayOf("ajj.a", "tgj.a")
+    private val KMP_CONV_METHOD_CANDIDATES = arrayOf("f")
+    private val KMP_SEND_CANDIDATES = arrayOf("d", "E")
+    private val KMP_MGR_OF_CANDIDATES = arrayOf("k")
+
     private var loader: ClassLoader? = null
-    private var cKwai: Class<*>? = null
-    private var cText: Class<*>? = null
-    private var cFactory: Class<*>? = null
-    private var cSender: Class<*>? = null
+
+    private var cKwaiMsg: Class<*>? = null
+    private var cTextMsg: Class<*>? = null
+    private var ctorMsg: Constructor<*>? = null
+
+    private var cKmpClients: Class<*>? = null
+    private var mKmpClientsOf: Method? = null
+    private var mKmpMgrOf: Method? = null
+    private var mKmpSend: Method? = null
+
+    private var sConv: Any? = null
+    private var mConvMsg: Method? = null
 
     @Volatile
     private var resolved = false
+    @Volatile
+    private var ready = false
+    @Volatile
+    private var reason = ""
 
     fun attach(cl: ClassLoader) {
         loader = cl
         resolved = false
+        ready = false
+        reason = ""
     }
 
     fun send(
@@ -34,20 +63,34 @@ object SparkSender {
         onResult: ((Boolean, String) -> Unit)? = null
     ): Boolean {
         resolve()
-        if (loader == null) return fail(onResult, "no_classloader")
+        if (!ready) return fail(onResult, "unavailable:$reason")
+        if (targetId.trim().isEmpty()) return fail(onResult, "empty_target")
+
         return try {
-            val msg = buildMessage(message) ?: return fail(onResult, "build_null")
-            val sender = findSender(targetId) ?: return fail(onResult, "no_sender")
-            val send = findSendMethod(sender.javaClass, msg.javaClass)
-                ?: return fail(onResult, "no_send_method")
-            val args = buildArgs(send, msg)
-            send.invoke(sender, *args)
-            Logger.d("spark_sender dispatched target=$targetId method=${send.name}")
-            onResult?.invoke(true, "sent")
+            val msg = buildMessage(targetId.trim(), message, 5)
+                ?: return fail(onResult, "build_null")
+            val subBiz = readSubBiz(msg).ifEmpty { "0" }
+            preSend(msg)
+
+            val conversation = mConvMsg?.invoke(sConv, msg)
+                ?: return fail(onResult, "conv_null")
+
+            var clients = mKmpClientsOf?.invoke(null, subBiz)
+            if (clients == null) clients = mKmpClientsOf?.invoke(null, "0")
+                ?: return fail(onResult, "clients_null")
+
+            val manager = mKmpMgrOf?.invoke(clients)
+                ?: return fail(onResult, "mgr_null")
+
+            val send = mKmpSend ?: return fail(onResult, "no_kmp_send")
+            send.invoke(manager, listOf(conversation), null, null)
+
+            Logger.d("spark_sender kmp sent target=$targetId subBiz=$subBiz method=${send.name}")
+            onResult?.invoke(true, "sent:kmp.${send.name}")
             true
         } catch (t: Throwable) {
             Logger.d("spark_sender failed target=$targetId err=${t.message}")
-            onResult?.invoke(false, t.message ?: t.javaClass.simpleName)
+            onResult?.invoke(false, "exception:${t.message ?: t.javaClass.simpleName}")
             false
         }
     }
@@ -61,102 +104,171 @@ object SparkSender {
         if (resolved) return
         synchronized(this) {
             if (resolved) return
-            val cl = loader
-            cKwai = opt(cl, "com.kwai.imsdk.msg.KwaiMsg")
-            cText = opt(cl, "com.kwai.imsdk.msg.TextMsg")
-            cFactory = opt(cl, "jfj.b3")
-            cSender = opt(cl, "jfj.f2") ?: opt(cl, "jfj.z2")
             resolved = true
-        }
-    }
-
-    private fun buildMessage(text: String): Any? {
-        cText?.declaredConstructors?.forEach { c ->
-            val p = c.parameterTypes
-            if (p.size == 1 && p[0] == String::class.java) {
-                c.isAccessible = true
-                return c.newInstance(text)
+            val cl = loader
+            if (cl == null) {
+                reason = "no_classloader"
+                return
             }
-        }
-        cKwai?.declaredConstructors?.forEach { c ->
-            c.isAccessible = true
-            return newInstanceWithDefaults(c, text)
-        }
-        return null
-    }
 
-    private fun findSender(targetId: String): Any? {
-        cFactory?.methods?.forEach { m ->
-            if (!Modifier.isStatic(m.modifiers)) return@forEach
-            if (m.parameterCount != 1 || m.parameterTypes[0] != String::class.java) return@forEach
-            if (m.returnType == Void.TYPE) return@forEach
             try {
-                val sender = m.invoke(null, targetId)
-                if (sender != null) return sender
-            } catch (_: Throwable) {
+                cKwaiMsg = Class.forName(CLS_KWAI_MSG, false, cl)
+                cTextMsg = Class.forName(CLS_TEXT_MSG, false, cl)
+                ctorMsg = cTextMsg?.getConstructor(
+                    Int::class.javaPrimitiveType,
+                    String::class.java,
+                    String::class.java
+                )
+            } catch (t: Throwable) {
+                reason = "msg_ctor:${t.message}"
+                return
             }
-        }
-        cSender?.let { cls ->
+
             try {
-                return cls.getDeclaredConstructor().newInstance()
-            } catch (_: Throwable) {
+                cKmpClients = Class.forName(CLS_KMP_CLIENTS, false, cl)
+                mKmpClientsOf = findStaticStringFactory(cKmpClients)
+                    ?: throw IllegalStateException("clients_of")
+
+                val clientCls = mKmpClientsOf!!.returnType
+                mKmpMgrOf = findMgrOf(clientCls)
+                    ?: throw IllegalStateException("mgr_of")
+
+                val mgrCls = mKmpMgrOf!!.returnType
+                mKmpSend = findKmpSend(mgrCls)
+                    ?: throw IllegalStateException("kmp_send")
+            } catch (t: Throwable) {
+                reason = "kmp:${t.message}"
+                return
             }
-        }
-        return null
-    }
 
-    private fun findSendMethod(cls: Class<*>, msgCls: Class<*>): Method? {
-        val names = setOf(
-            "g0", "e0", "Y", "c0",
-            "send", "sendSingle", "sendBatch", "sendNew"
-        )
-        var best: Method? = null
-        for (m in cls.methods) {
-            if (m.name !in names) continue
-            val p = m.parameterTypes
-            if (p.isEmpty() || !p[0].isAssignableFrom(msgCls)) continue
-            if (best == null || p.size < best.parameterCount) best = m
-        }
-        return best
-    }
-
-    private fun buildArgs(m: Method, msg: Any): Array<Any?> {
-        val p = m.parameterTypes
-        val args = arrayOfNulls<Any?>(p.size)
-        for (i in p.indices) {
-            args[i] = if (i == 0 && p[i].isAssignableFrom(msg.javaClass)) {
-                msg
-            } else {
-                defaultValue(p[i])
+            try {
+                resolveConverter(cl)
+            } catch (t: Throwable) {
+                reason = "converter:${t.message}"
+                return
             }
+
+            ready = true
+            Logger.d("spark_sender resolved kmp clientsOf=${mKmpClientsOf?.name} mgrOf=${mKmpMgrOf?.name} send=${mKmpSend?.name} conv=${mConvMsg?.name}")
         }
-        return args
     }
 
-    private fun newInstanceWithDefaults(c: Constructor<*>, text: String): Any {
-        val p = c.parameterTypes
-        val args = arrayOfNulls<Any?>(p.size)
-        for (i in p.indices) {
-            args[i] = if (p[i] == String::class.java) text else defaultValue(p[i])
-        }
-        return c.newInstance(*args)
-    }
-
-    private fun defaultValue(t: Class<*>): Any? = when (t) {
-        Boolean::class.javaPrimitiveType -> false
-        Byte::class.javaPrimitiveType -> 0.toByte()
-        Short::class.javaPrimitiveType -> 0.toShort()
-        Int::class.javaPrimitiveType -> 0
-        Long::class.javaPrimitiveType -> 0L
-        Float::class.javaPrimitiveType -> 0f
-        Double::class.javaPrimitiveType -> 0.0
-        Char::class.javaPrimitiveType -> '\u0000'
-        else -> null
-    }
-
-    private fun opt(cl: ClassLoader?, name: String): Class<*>? {
+    private fun buildMessage(targetId: String, text: String, scene: Int): Any? {
         return try {
-            if (cl == null) null else Class.forName(name, false, cl)
+            ctorMsg?.newInstance(scene, targetId, text)
+        } catch (t: Throwable) {
+            Logger.d("spark_sender buildMessage failed: ${t.message}")
+            null
+        }
+    }
+
+    private fun readSubBiz(msg: Any): String {
+        return try {
+            val m = msg.javaClass.getMethod("getSubBiz")
+            m.invoke(msg) as? String ?: ""
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
+    private fun preSend(msg: Any) {
+        try {
+            val cl = loader ?: return
+            val c = Class.forName("sej.w", false, cl)
+            val m = c.getDeclaredMethod("j", cKwaiMsg, Int::class.javaPrimitiveType)
+            m.isAccessible = true
+            m.invoke(null, msg, 0)
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun findStaticStringFactory(cls: Class<*>): Method? {
+        var fallback: Method? = null
+        for (m in cls.declaredMethods) {
+            if (!Modifier.isStatic(m.modifiers)) continue
+            if (m.parameterCount != 1 || m.parameterTypes[0] != String::class.java) continue
+            if (m.returnType == Void.TYPE) continue
+            if (m.returnType.isPrimitive) continue
+            if (m.returnType.name.startsWith("java.")) continue
+            if (m.name == "a") return m
+            if (fallback == null) fallback = m
+        }
+        return fallback
+    }
+
+    private fun findMgrOf(clientCls: Class<*>): Method? {
+        var fallback: Method? = null
+        for (m in clientCls.methods) {
+            if (m.parameterCount != 0) continue
+            val rt = m.returnType
+            if (rt == Void.TYPE || rt.isPrimitive) continue
+            if (rt.name.startsWith("java.") || rt.name.startsWith("kotlin.")) continue
+            if (m.name in KMP_MGR_OF_CANDIDATES) return m
+            if (fallback == null) fallback = m
+        }
+        return fallback
+    }
+
+    private fun findKmpSend(mgrCls: Class<*>): Method? {
+        var fallback: Method? = null
+        for (m in mgrCls.methods) {
+            val p = m.parameterTypes
+            if (p.size != 3) continue
+            if (p[0] != List::class.java) continue
+            if (m.returnType != Void.TYPE) continue
+            if (p[1].isPrimitive || p[1].name.startsWith("java.")) continue
+            if (p[2].isPrimitive || p[2].name.startsWith("java.")) continue
+            if (m.name in KMP_SEND_CANDIDATES) return m
+            if (fallback == null) fallback = m
+        }
+        return fallback
+    }
+
+    private fun resolveConverter(cl: ClassLoader) {
+        for (name in KMP_CONVERTER_CANDIDATES) {
+            val c = optClass(cl, name) ?: continue
+            val instance = staticSelfInstance(c) ?: continue
+            val method = findConvMethod(c) ?: continue
+            sConv = instance
+            mConvMsg = method
+            return
+        }
+        throw IllegalStateException("no_converter")
+    }
+
+    private fun staticSelfInstance(cls: Class<*>): Any? {
+        var c: Class<*>? = cls
+        while (c != null) {
+            for (f in c.declaredFields) {
+                if (!Modifier.isStatic(f.modifiers)) continue
+                if (f.type != cls) continue
+                try {
+                    f.isAccessible = true
+                    val v = f.get(null)
+                    if (v != null) return v
+                } catch (_: Throwable) {
+                }
+            }
+            c = c.superclass
+        }
+        return null
+    }
+
+    private fun findConvMethod(cls: Class<*>): Method? {
+        for (m in cls.methods) {
+            if (m.parameterCount != 1) continue
+            if (m.parameterTypes[0] != cKwaiMsg) continue
+            val rt = m.returnType
+            if (rt == Void.TYPE || rt.isPrimitive) continue
+            if (rt.name.startsWith("java.") || rt.name.startsWith("kotlin.")) continue
+            if (m.name in KMP_CONV_METHOD_CANDIDATES) return m
+        }
+        return null
+    }
+
+    private fun optClass(cl: ClassLoader, name: String): Class<*>? {
+        return try {
+            Class.forName(name, false, cl)
         } catch (_: Throwable) {
             null
         }
