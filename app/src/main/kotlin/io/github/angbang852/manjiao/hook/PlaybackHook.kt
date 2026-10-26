@@ -204,6 +204,7 @@ object PlaybackHook {
                                             return@intercept null
                                         }
                                         chain.proceed().also {
+                                            io.github.angbang852.manjiao.adapt.PlaybackState.setPlaying(true)
                                             currentPlayer = chain.thisObject
                                             if (legacyNoLoopActive() && pos != null && dur != null && pause != null && !checkRunning) {
                                                 startCheckThread(chain.thisObject, pos, dur, pause)
@@ -211,6 +212,13 @@ object PlaybackHook {
                                         }
                                     }
                                 mPauseRef = pause
+                                try {
+                                    xp.hook(pause).setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                                        .setId("pb.dexkit.pause").intercept { chain ->
+                                            io.github.angbang852.manjiao.adapt.PlaybackState.setPlaying(false)
+                                            chain.proceed()
+                                        }
+                                } catch (_: Throwable) {}
                                 hooked++
                                 Logger.once("dexkit.player", "DexKit hooked player: $cn")
                             } catch (_: Throwable) {}

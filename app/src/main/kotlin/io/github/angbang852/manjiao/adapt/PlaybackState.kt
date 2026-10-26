@@ -42,6 +42,12 @@ package io.github.angbang852.manjiao.adapt
  */
 object PlaybackState {
 
+    @Volatile private var playing = false
+
+    fun setPlaying(v: Boolean) { playing = v }
+
+    fun isPlaying(): Boolean = playing
+
     /** 实例 → 最近一次「播放完成」的时刻 */
     private val completionAt =
         java.util.Collections.synchronizedMap(java.util.WeakHashMap<Any, Long>())
