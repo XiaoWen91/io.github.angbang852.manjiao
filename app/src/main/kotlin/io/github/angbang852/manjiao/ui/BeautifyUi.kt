@@ -60,9 +60,7 @@ object BeautifyUi {
         root.addView(row(ctx, "修改偏移 / 缩放", "整体") { rightOffsetDialog(ctx) })
 
         root.addView(section(ctx, "文案信息"))
-        root.addView(toggleRow(ctx, "强制显示发布时间", Prefs.K_BEAUTY_FORCE_TIME, false))
-        root.addView(toggleRow(ctx, "时间精确到秒", Prefs.K_BEAUTY_TIME_SECONDS, true))
-        root.addView(toggleRow(ctx, "强制显示 IP 属地", Prefs.K_BEAUTY_FORCE_IP, false))
+        root.addView(toggleRow(ctx, "实验性：官方时间/IP（create_date_tv）", Prefs.K_BEAUTY_OFFICIAL_DATE, false))
 
         root.addView(section(ctx, "操作确认"))
         root.addView(toggleRow(ctx, "点赞前确认", Prefs.K_CONFIRM_LIKE, false))

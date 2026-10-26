@@ -50,6 +50,7 @@ object BeautifyHooks {
         hookHomeCoin(module, cl)
         hookUnionView(module, cl)
         hookCaptionInfo(module, cl)
+        hookOfficialDate(module, cl)
         hookCaptionTextView(module, cl)
         hookUserNameFallback(module, cl)
         hookPlaybackAlpha(module, cl)
@@ -771,10 +772,9 @@ object BeautifyHooks {
                         uiRoots[tv] = "caption"
                         applyPlayAlpha(null)
                         reapplyRight()
-                        applyCaptionTo(tv)
-                        tv.postDelayed({ applyCaptionTo(tv) }, 250L)
-                        tv.postDelayed({ applyCaptionTo(tv) }, 800L)
-                        tv.postDelayed({ applyCaptionTo(tv) }, 1500L)
+                        applyOfficialDate(tv.rootView)
+                        tv.postDelayed({ applyOfficialDate(tv.rootView) }, 300L)
+                        tv.postDelayed({ applyOfficialDate(tv.rootView) }, 800L)
                     }
                 } catch (_: Throwable) {
                 }
@@ -785,28 +785,68 @@ object BeautifyHooks {
         }
     }
 
-    private fun applyCaptionTo(tv: TextView) {
+    private fun hookOfficialDate(module: XposedModule, cl: ClassLoader) {
         try {
-            val rawOld = tv.text?.toString().orEmpty()
-            val old = rawOld.lineSequence().filterNot { line ->
-                line.matches(Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.*""")) || line.contains("IP:")
-            }.joinToString("\n").trimEnd()
-            if (!Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) && !Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) return
-            val current = CurrentPhotoHook.currentPhotoPublic()
-            val photo = current ?: lastPhoto?.takeIf {
-                System.currentTimeMillis() - lastPhotoAt <= 3000L
+            val c = Class.forName("com.yxcorp.gifshow.detail.PhotoDetailActivity", false, cl)
+            val m = c.declaredMethods.firstOrNull { it.name == "onResume" && it.parameterCount == 0 } ?: return
+            install(module, m, "beauty.official.date") { chain ->
+                val r = chain.proceed()
+                try {
+                    val act = chain.thisObject as? android.app.Activity
+                    val root = act?.window?.decorView
+                    applyOfficialDate(root)
+                    root?.postDelayed({ applyOfficialDate(root) }, 300L)
+                    root?.postDelayed({ applyOfficialDate(root) }, 800L)
+                } catch (_: Throwable) {
+                }
+                r
             }
-            if (photo == null) return
-            val add = captionExtra(photo)
-            if (add.isBlank()) return
-            if (old.contains(add)) return
-            val sb = android.text.SpannableStringBuilder()
-            if (old.isNotEmpty()) sb.append(old).append('\n')
-            sb.append(add)
-            tv.text = sb
-            lastCaptionSeen = System.currentTimeMillis()
+        } catch (t: Throwable) {
+            Logger.d("beauty official date miss: ${t.message}")
+        }
+    }
+
+    private fun applyOfficialDate(root: View?) {
+        if (root == null) return
+        if (!Prefs.bool(Prefs.K_BEAUTY_OFFICIAL_DATE, false)) return
+        try {
+            val id = root.context.resources.getIdentifier("create_date_tv", "id", "com.smile.gifmaker")
+            if (id == 0) return
+            val v = findViewId(root, id) ?: return
+            val tv = v as? TextView ?: return
+            val photo = CurrentPhotoHook.currentPhotoPublic() ?: lastPhoto?.takeIf {
+                System.currentTimeMillis() - lastPhotoAt <= 5000L
+            }
+            val text = officialDateText(photo)
+            if (text.isNotBlank()) tv.text = text
+            tv.visibility = View.VISIBLE
         } catch (_: Throwable) {
         }
+    }
+
+    private fun findViewId(v: View, id: Int): View? {
+        if (v.id == id) return v
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) {
+                findViewId(v.getChildAt(i), id)?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun officialDateText(photo: Any?): String {
+        if (photo == null) return ""
+        val ts = callLong(photo, "getKCreatedTime")
+        if (ts <= 0L) return ""
+        val time = formatTimestamp(ts, false)
+        val ip = callString(photo, "getCaptionIpLocation")
+        if (ip.isBlank()) return time
+        val clean = ip.removePrefix("IP属地：").removePrefix("IP属地:").removePrefix("IP:")
+        return "$time · 发布于$clean"
+    }
+
+    private fun applyCaptionTo(tv: TextView) {
+        // Disabled: old CaptionTextView injection replaced by official create_date_tv experiment.
     }
 
     private fun hookUserNameFallback(module: XposedModule, cl: ClassLoader) {
