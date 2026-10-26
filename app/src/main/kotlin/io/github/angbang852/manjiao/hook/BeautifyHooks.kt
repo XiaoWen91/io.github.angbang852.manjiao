@@ -31,6 +31,7 @@ object BeautifyHooks {
     private val pendantRoots = java.util.WeakHashMap<View, Boolean>()
     private var loader: ClassLoader? = null
     private var lastPhoto: Any? = null
+    private var lastCaptionSeen = 0L
 
     fun hook(module: XposedModule, cl: ClassLoader) {
         loader = cl
@@ -45,6 +46,7 @@ object BeautifyHooks {
         hookUnionView(module, cl)
         hookCaptionInfo(module, cl)
         hookCaptionTextView(module, cl)
+        hookUserNameFallback(module, cl)
         hookPlaybackAlpha(module, cl)
     }
 
@@ -165,7 +167,7 @@ object BeautifyHooks {
                         if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false)) {
                             val p = self.parent as? ViewGroup
                             if (p != null && p.width > 0 && self.width > 0) {
-                                val dx = centerGapTranslation(self, p)
+                                val dx = 0f
                                 try { self.translationX = dx } catch (_: Throwable) {}
                             }
                         } else {
@@ -268,7 +270,7 @@ object BeautifyHooks {
             if (v.javaClass.name.contains("BottomBarShootView") && Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false)) {
                 val p = v.parent as? ViewGroup
                 if (p != null && p.width > 0 && v.width > 0) {
-                    v.translationX = centerGapTranslation(v, p)
+                    v.translationX = 0f
                 }
             }
             if (v is ViewGroup) {
@@ -294,7 +296,7 @@ object BeautifyHooks {
                 }
             }
             for (m in c.declaredMethods) {
-                if (m.name == "onAttachedToWindow" || m.name == "onVisibilityChanged") {
+                if (m.name == "onAttachedToWindow" || m.name == "onVisibilityChanged" || m.name == "onWindowVisibilityChanged") {
                     install(module, m, "beauty.union.${m.name}") { chain ->
                         val r = chain.proceed()
                         try {
@@ -454,9 +456,19 @@ object BeautifyHooks {
         if (ll.childCount < 2) return
         val hidden = Prefs.str(Prefs.K_BEAUTY_RIGHT_HIDE, "")
             .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val musicId = try {
+            ll.context.resources.getIdentifier("music_wheel_container", "id", "com.smile.gifmaker")
+        } catch (_: Throwable) { 0 }
         var matched = 0
         for (i in 0 until ll.childCount) {
             val child = ll.getChildAt(i)
+            if (musicId != 0 && child.id == musicId) {
+                if (hidden.contains("音乐")) {
+                    child.visibility = View.GONE
+                    matched++
+                }
+                continue
+            }
             val label = labelOf(child)
             if (hidden.any { label.contains(it) }) {
                 child.visibility = View.GONE
@@ -665,6 +677,17 @@ object BeautifyHooks {
         } catch (t: Throwable) {
             Logger.d("beauty fullscreen miss: ${t.message}")
         }
+        try {
+            val c = Class.forName("com.yxcorp.gifshow.detail.presenter.landscape.a", false, cl)
+            val m = c.declaredMethods.firstOrNull { it.name == "onBind" && it.parameterCount == 0 }
+            if (m != null) {
+                install(module, m, "beauty.fullscreen.landscape") { chain ->
+                    if (Prefs.bool(Prefs.K_BEAUTY_NO_FULLSCREEN, false)) null else chain.proceed()
+                }
+            }
+        } catch (t: Throwable) {
+            Logger.d("beauty fullscreen landscape miss: ${t.message}")
+        }
     }
 
     private fun hookCaptionInfo(module: XposedModule, cl: ClassLoader) {
@@ -701,24 +724,12 @@ object BeautifyHooks {
                 val r = chain.proceed()
                 try {
                     val tv = chain.thisObject as? TextView
-                    val photo = lastPhoto
-                    if (tv != null && photo != null &&
-                        (Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) || Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false))) {
-                        val add = captionExtra(photo)
-                        val old = tv.text?.toString().orEmpty()
-                        if (add.isNotBlank() && !old.contains(add)) {
-                            val sb = android.text.SpannableStringBuilder()
-                            if (old.isNotEmpty()) sb.append(old).append('\n')
-                            val start = sb.length
-                            sb.append(add)
-                            sb.setSpan(
-                                android.text.style.ForegroundColorSpan(0xFF888888.toInt()),
-                                start,
-                                sb.length,
-                                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                            )
-                            tv.text = sb
-                        }
+                    if (tv != null) {
+                        uiRoots[tv] = "caption"
+                        applyPlayAlpha(null)
+                        applyCaptionTo(tv)
+                        tv.postDelayed({ applyCaptionTo(tv) }, 250L)
+                        tv.postDelayed({ applyCaptionTo(tv) }, 800L)
                     }
                 } catch (_: Throwable) {
                 }
@@ -726,6 +737,73 @@ object BeautifyHooks {
             }
         } catch (t: Throwable) {
             Logger.d("beauty caption textview miss: ${t.message}")
+        }
+    }
+
+    private fun applyCaptionTo(tv: TextView) {
+        try {
+            val photo = lastPhoto ?: return
+            if (!Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) && !Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) return
+            val add = captionExtra(photo)
+            if (add.isBlank()) return
+            val old = tv.text?.toString().orEmpty()
+            if (old.contains(add)) return
+            val sb = android.text.SpannableStringBuilder()
+            if (old.isNotEmpty()) sb.append(old).append('
+')
+            val start = sb.length
+            sb.append(add)
+            sb.setSpan(
+                android.text.style.ForegroundColorSpan(0xFF888888.toInt()),
+                start,
+                sb.length,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            tv.text = sb
+            lastCaptionSeen = System.currentTimeMillis()
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun hookUserNameFallback(module: XposedModule, cl: ClassLoader) {
+        try {
+            val c = Class.forName("com.kwai.slide.play.detail.common.information.username.UserNameLinearLayout", false, cl)
+            val m = c.getDeclaredMethod("onMeasure", Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!)
+            install(module, m, "beauty.caption.username.fallback") { chain ->
+                val r = chain.proceed()
+                try {
+                    if (lastPhoto != null && System.currentTimeMillis() - lastCaptionSeen > 800 &&
+                        (Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) || Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false))) {
+                        val self = chain.thisObject
+                        var tv: TextView? = null
+                        for (n in arrayOf("i", "k")) {
+                            try {
+                                val f = c.getDeclaredField(n)
+                                f.isAccessible = true
+                                val v = f.get(self) as? TextView
+                                if (v != null && !v.text.isNullOrEmpty()) { tv = v; break }
+                            } catch (_: Throwable) {
+                            }
+                        }
+                        if (tv == null) {
+                            try {
+                                val f = c.getDeclaredField("i")
+                                f.isAccessible = true
+                                tv = f.get(self) as? TextView
+                            } catch (_: Throwable) {
+                            }
+                        }
+                        if (tv != null) {
+                            uiRoots[tv] = "caption"
+                            applyCaptionTo(tv)
+                        }
+                    }
+                } catch (_: Throwable) {
+                }
+                r
+            }
+        } catch (t: Throwable) {
+            Logger.d("beauty caption username fallback miss: ${t.message}")
         }
     }
 
@@ -798,6 +876,7 @@ object BeautifyHooks {
                             depth++
                         }
                         applyPlayAlpha(null)
+                        v.postDelayed({ applyPlayAlpha(null) }, 200L)
                     }
                 } catch (_: Throwable) {
                 }
@@ -813,7 +892,7 @@ object BeautifyHooks {
                 if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
                 val target = raw.toFloatOrNull()?.coerceIn(0f, 1f)
                 val r = if (target != null) chain.proceed(arrayOf<Any?>(target)) else chain.proceed()
-                applyPlayAlpha(null)
+                if (target != null) applyPlayAlpha(null)
                 r
             }
         } catch (t: Throwable) {

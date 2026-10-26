@@ -258,7 +258,7 @@ object BeautifyUi {
         showDialog(ctx, "右侧整体偏移 / 缩放", col, "保存", {
             Prefs.setStrSync(ctx, Prefs.K_BEAUTY_RIGHT_OFFSET_X, (xBar.progress - 50).toString())
             Prefs.setStrSync(ctx, Prefs.K_BEAUTY_RIGHT_OFFSET_Y, (yBar.progress - 50).toString())
-            Prefs.setStrSync(ctx, Prefs.K_BEAUTY_RIGHT_SCALE, String.format("%.2f", sBar.progress / 100f))
+            Prefs.setStrSync(ctx, Prefs.K_BEAUTY_RIGHT_SCALE, String.format(java.util.Locale.US, "%.2f", sBar.progress / 100f))
             BeautifyHooks.reapply()
         })
     }
