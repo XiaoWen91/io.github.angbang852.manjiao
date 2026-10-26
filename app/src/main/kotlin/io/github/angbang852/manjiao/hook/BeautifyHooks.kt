@@ -764,10 +764,6 @@ object BeautifyHooks {
                 try {
                     val tv = chain.thisObject as? TextView
                     if (tv != null) {
-                        if (lastCaptionView?.get() !== tv) {
-                            lastPhoto = null
-                            lastPhotoAt = 0L
-                        }
                         lastCaptionSeen = System.currentTimeMillis()
                         lastCaptionView = java.lang.ref.WeakReference(tv)
                         uiRoots[tv] = "caption"
@@ -789,7 +785,7 @@ object BeautifyHooks {
     private fun applyCaptionTo(tv: TextView) {
         try {
             val photo = lastPhoto ?: return
-            if (System.currentTimeMillis() - lastPhotoAt > 1500L) return
+            if (System.currentTimeMillis() - lastPhotoAt > 3000L) return
             if (!Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) && !Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) return
             val add = captionExtra(photo)
             if (add.isBlank()) return
@@ -941,7 +937,7 @@ object BeautifyHooks {
             val accept = i2.getDeclaredMethod("accept", Any::class.java)
             install(module, accept, "beauty.play.alpha.apply") { chain ->
                 val observed = chain.getArg(0) as? Float
-                val playing = io.github.angbang852.manjiao.adapt.PlaybackState.isPlaying()
+                val playing = if (observed != null && observed >= 0.99f) false else !isPlaying()
                 val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
                 var raw = Prefs.str(key, "")
                 if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
@@ -957,7 +953,7 @@ object BeautifyHooks {
 
     private fun applyPlayAlpha(observed: Float?) {
         try {
-            val playing = io.github.angbang852.manjiao.adapt.PlaybackState.isPlaying()
+            val playing = if (observed != null && observed >= 0.99f) false else !isPlaying()
             val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
             var raw = Prefs.str(key, "")
             if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")

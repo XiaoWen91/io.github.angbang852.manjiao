@@ -68,10 +68,14 @@ object ConfirmActionHooks {
 
     private fun actionOf(v: View): Action? {
         val res = v.resources
-        val likeId = res.getIdentifier("like_element_click_layout", "id", "com.smile.gifmaker")
-        val collectId = res.getIdentifier("click_area_collect", "id", "com.smile.gifmaker")
-        if (likeId != 0 && v.id == likeId && Prefs.bool(Prefs.K_CONFIRM_LIKE, false)) return Action("like", "点赞")
-        if (collectId != 0 && v.id == collectId && Prefs.bool(Prefs.K_CONFIRM_COLLECT, false)) return Action("collect", "收藏")
+        val likeIds = listOf("like_element_click_layout", "like_button")
+            .map { res.getIdentifier(it, "id", "com.smile.gifmaker") }
+            .filter { it != 0 }
+        val collectIds = listOf("click_area_collect", "collect_button")
+            .map { res.getIdentifier(it, "id", "com.smile.gifmaker") }
+            .filter { it != 0 }
+        if (v.id in likeIds && Prefs.bool(Prefs.K_CONFIRM_LIKE, false)) return Action("like", "点赞")
+        if (v.id in collectIds && Prefs.bool(Prefs.K_CONFIRM_COLLECT, false)) return Action("collect", "收藏")
         if (Prefs.bool(Prefs.K_CONFIRM_FOLLOW, false) && containsFollow(v, 3)) return Action("follow", "关注")
         return null
     }
