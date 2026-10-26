@@ -26,7 +26,7 @@ object SparkSettingsEntry {
 
             val row = TextView(activity).apply {
                 tag = TAG
-                text = "KsSpark 续火花 / 防撤回 / 已读 / 更多功能"
+                text = "KiraTools"
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER_VERTICAL

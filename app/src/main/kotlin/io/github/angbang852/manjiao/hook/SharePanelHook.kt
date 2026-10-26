@@ -155,7 +155,7 @@ object SharePanelHook {
             iv.postDelayed(forceIcon, 300)
         }
         try {
-            if (tv.text?.toString() != "ManJiao") tv.text = "ManJiao"
+            if (tv.text?.toString() != "KiraTools") tv.text = "KiraTools"
         } catch (_: Throwable) {}
         val open = Runnable {
             try { hostDialog.dismiss() } catch (_: Throwable) {}

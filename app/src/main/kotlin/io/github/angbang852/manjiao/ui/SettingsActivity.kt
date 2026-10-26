@@ -188,7 +188,7 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(14), dp(56), dp(14), dp(24))
             layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
-        container.addView(titleView("ManJiao"))
+        container.addView(titleView("KiraTools"))
         container.addView(space(2))
         // app 侧背景无 SF 跨窗模糊加持：wash 在模块默认 40% 基础上调 50%
         //（60% 偏实被要求降）；模块菜单不传该参数保持原值

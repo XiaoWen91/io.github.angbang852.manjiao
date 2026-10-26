@@ -120,7 +120,7 @@ object MainMenuDialog {
             Item("", "美化") { showBeautify(ctx) },
         )
         mark("buildItems")
-        showSheet(ctx, "ManJiao", items, null)
+        showSheet(ctx, "KiraTools", items, null)
         mark("showSheetTotal")
         } finally { }
     }
@@ -1870,7 +1870,7 @@ object MainMenuDialog {
             bar.addView(holder)
             bar.addView(space(ctx, 0, 10))
         }
-        if (title == "ManJiao") {
+        if (title == "KiraTools") {
             val stroke = TextView(ctx).apply {
                 text = title; textSize = 28f
                 setTypeface(typeface, android.graphics.Typeface.BOLD)

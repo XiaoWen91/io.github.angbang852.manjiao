@@ -135,7 +135,7 @@ object DownloadService {
                 }
             }
             val n = NotificationCompat.Builder(ctx, CH)
-                .setContentTitle("ManJiao 下载队列")
+                .setContentTitle("KiraTools 下载队列")
                 .setContentText(text.ifBlank { "空闲" })
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setOngoing(pending.isNotEmpty())
@@ -527,7 +527,7 @@ object DownloadService {
             val indet = prog == -1
             val ongoing = prog == -1 || prog in 1..99
             val builder = NotificationCompat.Builder(ctx, CH)
-                .setContentTitle("ManJiao").setContentText(text)
+                .setContentTitle("KiraTools").setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setOngoing(ongoing)
             if (indet) builder.setProgress(0, 0, true)

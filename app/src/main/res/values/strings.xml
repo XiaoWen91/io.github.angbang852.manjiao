@@ -1,10 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ManJiao</string>
-    <string name="module_desc">ManJiao：无水印下载 / 沉浸式 / 内容过滤</string>
+    <string name="app_name">KiraTools</string>
+    <string name="module_desc">KiraTools</string>
 
     <!-- 主菜单 -->
-    <string name="menu_title">ManJiao</string>
+    <string name="menu_title">KiraTools</string>
     <string name="menu_download">下载</string>
     <string name="menu_immersive">沉浸式页面</string>
     <string name="menu_filter">内容过滤</string>
