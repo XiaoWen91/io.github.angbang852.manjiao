@@ -79,11 +79,11 @@ object ConfirmActionHooks {
     private fun containsFollow(v: View, depth: Int): Boolean {
         if (v.javaClass.name.contains("TransitionKwaiImageView")) return true
         if (depth <= 0) return false
-        var p: android.view.ViewParent? = v.parent
+        var p: View? = v.parent as? View
         var d = 0
-        while (p is View && d < depth) {
+        while (p != null && d < depth) {
             if (p.javaClass.name.contains("TransitionKwaiImageView")) return true
-            p = p.parent
+            p = p.parent as? View
             d++
         }
         if (v is android.view.ViewGroup) {
