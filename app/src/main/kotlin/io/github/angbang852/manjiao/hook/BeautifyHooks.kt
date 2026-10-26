@@ -34,6 +34,7 @@ object BeautifyHooks {
     private var loader: ClassLoader? = null
     private var lastPhoto: Any? = null
     private var lastPhotoAt = 0L
+    private var playerStateHooked = false
     private var lastCaptionSeen = 0L
     private var lastCaptionView: java.lang.ref.WeakReference<TextView>? = null
 
@@ -52,6 +53,7 @@ object BeautifyHooks {
         hookCaptionTextView(module, cl)
         hookUserNameFallback(module, cl)
         hookPlaybackAlpha(module, cl)
+        hookPlayerState(module, cl)
     }
 
     fun reapply() {
@@ -772,6 +774,7 @@ object BeautifyHooks {
                         applyCaptionTo(tv)
                         tv.postDelayed({ applyCaptionTo(tv) }, 250L)
                         tv.postDelayed({ applyCaptionTo(tv) }, 800L)
+                        tv.postDelayed({ applyCaptionTo(tv) }, 1500L)
                     }
                 } catch (_: Throwable) {
                 }
@@ -784,15 +787,18 @@ object BeautifyHooks {
 
     private fun applyCaptionTo(tv: TextView) {
         try {
-            val photo = lastPhoto ?: return
-            if (System.currentTimeMillis() - lastPhotoAt > 3000L) return
-            if (!Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) && !Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) return
-            val add = captionExtra(photo)
-            if (add.isBlank()) return
             val rawOld = tv.text?.toString().orEmpty()
             val old = rawOld.lineSequence().filterNot { line ->
                 line.matches(Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.*""")) || line.contains("IP:")
             }.joinToString("\n").trimEnd()
+            if (!Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) && !Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) return
+            val current = CurrentPhotoHook.currentPhotoPublic()
+            val photo = current ?: lastPhoto?.takeIf {
+                System.currentTimeMillis() - lastPhotoAt <= 3000L
+            }
+            if (photo == null) return
+            val add = captionExtra(photo)
+            if (add.isBlank()) return
             if (old.contains(add)) return
             val sb = android.text.SpannableStringBuilder()
             if (old.isNotEmpty()) sb.append(old).append('\n')
@@ -937,7 +943,7 @@ object BeautifyHooks {
             val accept = i2.getDeclaredMethod("accept", Any::class.java)
             install(module, accept, "beauty.play.alpha.apply") { chain ->
                 val observed = chain.getArg(0) as? Float
-                val playing = if (observed != null && observed >= 0.99f) false else !isPlaying()
+                val playing = if (playerStateHooked) io.github.angbang852.manjiao.adapt.PlaybackState.isPlaying() else if (observed != null && observed >= 0.99f) false else !isPlaying()
                 val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
                 var raw = Prefs.str(key, "")
                 if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
@@ -951,9 +957,42 @@ object BeautifyHooks {
         }
     }
 
+    private fun hookPlayerState(module: XposedModule, cl: ClassLoader) {
+        val names = arrayOf(
+            "com.kwai.video.player.kwai_player.KwaiMediaPlayer",
+            "com.kwai.video.player.KsMediaPlayerImpl",
+            "com.kwai.video.aemonplayer.AemonMediaPlayer",
+            "com.kwai.video.wayne.player.main.WaynePlayer"
+        )
+        names.forEachIndexed { idx, cn ->
+            try {
+                val c = Class.forName(cn, false, cl)
+                val start = c.declaredMethods.firstOrNull { it.name == "start" && it.parameterCount == 0 }
+                val pause = c.declaredMethods.firstOrNull { it.name == "pause" && it.parameterCount == 0 }
+                if (start != null) {
+                    install(module, start, "beauty.player.start.$idx") { chain ->
+                        val r = chain.proceed()
+                        io.github.angbang852.manjiao.adapt.PlaybackState.setPlaying(true)
+                        r
+                    }
+                    playerStateHooked = true
+                }
+                if (pause != null) {
+                    install(module, pause, "beauty.player.pause.$idx") { chain ->
+                        io.github.angbang852.manjiao.adapt.PlaybackState.setPlaying(false)
+                        chain.proceed()
+                    }
+                    playerStateHooked = true
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        Logger.d("beauty player state hooked=$playerStateHooked")
+    }
+
     private fun applyPlayAlpha(observed: Float?) {
         try {
-            val playing = if (observed != null && observed >= 0.99f) false else !isPlaying()
+            val playing = if (playerStateHooked) io.github.angbang852.manjiao.adapt.PlaybackState.isPlaying() else if (observed != null && observed >= 0.99f) false else !isPlaying()
             val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
             var raw = Prefs.str(key, "")
             if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")

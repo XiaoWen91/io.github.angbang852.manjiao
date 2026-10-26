@@ -106,6 +106,29 @@ object CurrentPhotoHook {
     } catch (_: Throwable) { null }
 
     /** ② 数据层当前条的 photoId（取自 SlidePlayViewModel 下标 + 按下标取条目） */
+    fun currentPhotoCaptionPublic(): String? {
+        return try {
+            currentPhotoPublic()?.let { CfhUtil.readCaption(it) }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    fun currentPhotoPublic(): Any? {
+        return try {
+            val vm = vmRef?.get() ?: return null
+            val idx = currentIndex()
+            if (idx < 0) return null
+            for (m2 in methodIdx) {
+                val r = try { m2.invoke(vm, idx) } catch (_: Throwable) { null }
+                if (r != null) return r
+            }
+            null
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     fun currentPhotoIdPublic(): String? {
         return try {
             val vm = vmRef?.get() ?: return null
