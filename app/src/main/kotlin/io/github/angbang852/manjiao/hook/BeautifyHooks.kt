@@ -749,8 +749,7 @@ object BeautifyHooks {
             val old = tv.text?.toString().orEmpty()
             if (old.contains(add)) return
             val sb = android.text.SpannableStringBuilder()
-            if (old.isNotEmpty()) sb.append(old).append('
-')
+            if (old.isNotEmpty()) sb.append(old).append('\n')
             val start = sb.length
             sb.append(add)
             sb.setSpan(
