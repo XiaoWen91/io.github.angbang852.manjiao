@@ -561,7 +561,7 @@ object SparkHooks {
             now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
         val sameYear = now.get(Calendar.YEAR) == then.get(Calendar.YEAR)
         val pattern = when {
-            sameDay -> "HH:mm"
+            sameDay -> "HH:mm.ss"
             sameYear -> "MM-dd HH:mm"
             else -> "yyyy-MM-dd"
         }

@@ -10,7 +10,7 @@ android {
     compileSdk = 35
     ndkVersion = "26.1.10909125"
     defaultConfig {
-        applicationId = "io.github.angbang852.manjiao"
+        applicationId = "com.KiraTools.Wen"
         minSdk = 24
         targetSdk = 35
         versionCode = 2
