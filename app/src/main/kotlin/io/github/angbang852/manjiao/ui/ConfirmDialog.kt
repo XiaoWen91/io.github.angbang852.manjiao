@@ -48,15 +48,15 @@ object ConfirmDialog {
                     setTextColor(0xB3FFFFFF.toInt())
                     textSize = 14f
                     setPadding(0, dp(activity, 10), 0, 0)
-                    lineSpacing(dp(activity, 3).toFloat(), 1f)
+                    setLineSpacing(dp(activity, 3).toFloat(), 1f)
                 })
                 val row = LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.END
                     setPadding(0, dp(activity, 18), 0, 0)
                 }
-                row.addView(btn(activity, "取消", 0x22FFFFFF, 0xE6FFFFFF) { dialog.dismiss() })
-                row.addView(btn(activity, confirmText, 0xFFFF6A00, Color.WHITE) {
+                row.addView(btn(activity, "取消", 0x22FFFFFF, 0xE6FFFFFF.toInt()) { dialog.dismiss() })
+                row.addView(btn(activity, confirmText, 0xFFFF6A00.toInt(), Color.WHITE) {
                     dialog.dismiss()
                     try { onConfirm() } catch (_: Throwable) {}
                 })

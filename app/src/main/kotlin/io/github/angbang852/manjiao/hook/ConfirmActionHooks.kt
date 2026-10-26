@@ -16,37 +16,49 @@ object ConfirmActionHooks {
     fun hook(module: XposedModule, cl: ClassLoader) {
         try {
             val m = View::class.java.getDeclaredMethod("performClick")
+            val hooker = XposedInterface.Hooker { chain ->
+                val v = chain.thisObject as? View
+                if (v == null) {
+                    chain.proceed()
+                } else if (bypass.get() == true) {
+                    chain.proceed()
+                } else {
+                    val action = actionOf(v)
+                    if (action == null) {
+                        chain.proceed()
+                    } else if (showing) {
+                        true
+                    } else {
+                        val act = unwrap(v.context)
+                        if (act == null) {
+                            chain.proceed()
+                        } else {
+                            showing = true
+                            ConfirmDialog.show(
+                                act,
+                                "确认${action.label}",
+                                "确定要${action.label}这条视频吗？",
+                                "确认",
+                                onConfirm = {
+                                    bypass.set(true)
+                                    try {
+                                        v.performClick()
+                                    } catch (_: Throwable) {
+                                    } finally {
+                                        bypass.set(false)
+                                    }
+                                },
+                                onDismiss = { showing = false }
+                            )
+                            true
+                        }
+                    }
+                }
+            }
             module.hook(m)
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
                 .setId("confirm.action.click")
-                .intercept { chain ->
-                    val v = chain.thisObject as? View
-                    if (v == null) return@intercept chain.proceed()
-                    if (bypass.get() == true) return@intercept chain.proceed()
-                    val action = actionOf(v)
-                    if (action == null) return@intercept chain.proceed()
-                    if (showing) return true
-                    val act = unwrap(v.context)
-                    if (act == null) return@intercept chain.proceed()
-                    showing = true
-                    ConfirmDialog.show(
-                        act,
-                        "确认${action.label}",
-                        "确定要${action.label}这条视频吗？",
-                        "确认",
-                        onConfirm = {
-                            bypass.set(true)
-                            try {
-                                v.performClick()
-                            } catch (_: Throwable) {
-                            } finally {
-                                bypass.set(false)
-                            }
-                        },
-                        onDismiss = { showing = false }
-                    )
-                    true
-                }
+                .intercept(hooker)
         } catch (t: Throwable) {
             Logger.d("confirm action hook miss: ${t.message}")
         }
@@ -67,7 +79,7 @@ object ConfirmActionHooks {
     private fun containsFollow(v: View, depth: Int): Boolean {
         if (v.javaClass.name.contains("TransitionKwaiImageView")) return true
         if (depth <= 0) return false
-        var p = v.parent
+        var p: android.view.ViewParent? = v.parent
         var d = 0
         while (p is View && d < depth) {
             if (p.javaClass.name.contains("TransitionKwaiImageView")) return true
