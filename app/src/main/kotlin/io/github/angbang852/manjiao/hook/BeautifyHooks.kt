@@ -26,11 +26,13 @@ object BeautifyHooks {
     private val bottomRegions = java.util.WeakHashMap<Any, Boolean>()
     private val bottomTabEntries = java.util.WeakHashMap<ViewGroup, MutableList<Triple<View, Int, ViewGroup.LayoutParams>>>()
     private val rightTagged = java.util.WeakHashMap<ViewGroup, Boolean>()
+    private var lastRight: java.lang.ref.WeakReference<ViewGroup>? = null
     private val bottomContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val rightContainers = java.util.WeakHashMap<ViewGroup, Boolean>()
     private val pendantRoots = java.util.WeakHashMap<View, Boolean>()
     private var loader: ClassLoader? = null
     private var lastPhoto: Any? = null
+    private var lastPhotoAt = 0L
     private var lastCaptionSeen = 0L
     private var lastCaptionView: java.lang.ref.WeakReference<TextView>? = null
 
@@ -284,9 +286,8 @@ object BeautifyHooks {
     private fun hookUnionView(module: XposedModule, cl: ClassLoader) {
         try {
             val c = Class.forName("com.kuaishou.growth.pendant.coin.core.kds.unionwidget.UnionView", false, cl)
-            val ctor = c.declaredConstructors.minByOrNull { it.parameterCount }
-            if (ctor != null) {
-                installCtor(module, ctor, "beauty.union.ctor") { chain ->
+            c.declaredConstructors.forEachIndexed { index, ctor ->
+                installCtor(module, ctor, "beauty.union.ctor.$index") { chain ->
                     val r = chain.proceed()
                     try {
                         val self = chain.thisObject as? View
@@ -297,7 +298,7 @@ object BeautifyHooks {
                 }
             }
             for (m in c.declaredMethods) {
-                if (m.name == "onAttachedToWindow" || m.name == "onVisibilityChanged" || m.name == "onWindowVisibilityChanged") {
+                if (m.name == "onAttachedToWindow" || m.name == "onVisibilityChanged" || m.name == "onWindowVisibilityChanged" || m.name == "onLayout") {
                     install(module, m, "beauty.union.${m.name}") { chain ->
                         val r = chain.proceed()
                         try {
@@ -459,6 +460,7 @@ object BeautifyHooks {
 
     private fun applyRightContainer(ll: ViewGroup) {
         if (!rightTagged.containsKey(ll)) return
+        lastRight = java.lang.ref.WeakReference(ll)
         if (ll.childCount < 2) return
         val hidden = Prefs.str(Prefs.K_BEAUTY_RIGHT_HIDE, "")
             .split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -495,6 +497,16 @@ object BeautifyHooks {
         try {
             ll.scaleX = s
             ll.scaleY = s
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun reapplyRight() {
+        try {
+            lastRight?.get()?.let {
+                applyRightContainer(it)
+                applyPlayAlpha(null)
+            }
         } catch (_: Throwable) {
         }
     }
@@ -704,6 +716,7 @@ object BeautifyHooks {
             install(module, m, "beauty.caption.time") { chain ->
                 val r = chain.proceed()
                 lastPhoto = chain.getArg(0)
+                lastPhotoAt = System.currentTimeMillis()
                 r
             }
         } catch (t: Throwable) {
@@ -715,6 +728,7 @@ object BeautifyHooks {
             install(module, gm, "beauty.caption.photo") { chain ->
                 val r = chain.proceed()
                 lastPhoto = chain.thisObject
+                lastPhotoAt = System.currentTimeMillis()
                 r
             }
         } catch (t: Throwable) {
@@ -735,6 +749,7 @@ object BeautifyHooks {
                         lastCaptionView = java.lang.ref.WeakReference(tv)
                         uiRoots[tv] = "caption"
                         applyPlayAlpha(null)
+                        reapplyRight()
                         applyCaptionTo(tv)
                         tv.postDelayed({ applyCaptionTo(tv) }, 250L)
                         tv.postDelayed({ applyCaptionTo(tv) }, 800L)
@@ -751,6 +766,7 @@ object BeautifyHooks {
     private fun applyCaptionTo(tv: TextView) {
         try {
             val photo = lastPhoto ?: return
+            if (System.currentTimeMillis() - lastPhotoAt > 3000L) return
             if (!Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) && !Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) return
             val add = captionExtra(photo)
             if (add.isBlank()) return
@@ -761,14 +777,7 @@ object BeautifyHooks {
             if (old.contains(add)) return
             val sb = android.text.SpannableStringBuilder()
             if (old.isNotEmpty()) sb.append(old).append('\n')
-            val start = sb.length
             sb.append(add)
-            sb.setSpan(
-                android.text.style.ForegroundColorSpan(0xFF888888.toInt()),
-                start,
-                sb.length,
-                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
             tv.text = sb
             lastCaptionSeen = System.currentTimeMillis()
         } catch (_: Throwable) {
@@ -793,6 +802,7 @@ object BeautifyHooks {
                         }
                     }
                     applyPlayAlpha(null)
+                    reapplyRight()
                     if (lastPhoto != null && lastCaptionView?.get()?.isAttachedToWindow != true &&
                         System.currentTimeMillis() - lastCaptionSeen > 800 &&
                         (Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) || Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false))) {
@@ -907,13 +917,14 @@ object BeautifyHooks {
             val i2 = Class.forName("t6h.i2", false, cl)
             val accept = i2.getDeclaredMethod("accept", Any::class.java)
             install(module, accept, "beauty.play.alpha.apply") { chain ->
-                val playing = !isPlaying()
+                val observed = chain.getArg(0) as? Float
+                val playing = if (observed != null && observed >= 0.99f) false else !isPlaying()
                 val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
                 var raw = Prefs.str(key, "")
                 if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
                 val target = raw.toFloatOrNull()?.coerceIn(0f, 1f)
                 val r = if (target != null) chain.proceed(arrayOf<Any?>(target)) else chain.proceed()
-                if (target != null) applyPlayAlpha(null)
+                if (target != null) applyPlayAlpha(observed)
                 r
             }
         } catch (t: Throwable) {
@@ -923,7 +934,7 @@ object BeautifyHooks {
 
     private fun applyPlayAlpha(observed: Float?) {
         try {
-            val playing = !isPlaying()
+            val playing = if (observed != null && observed >= 0.99f) false else !isPlaying()
             val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
             var raw = Prefs.str(key, "")
             if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
