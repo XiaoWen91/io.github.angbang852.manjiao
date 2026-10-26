@@ -26,19 +26,16 @@ object SparkRecallMedia {
 
     fun attach(tv: TextView, origin: Any?) {
         if (origin == null) return
+        attach(tv, payloadOf(origin), null)
+    }
+
+    fun attach(tv: TextView, payload: ByteArray?, localPath: String?) {
         try {
-            val payload = payloadOf(origin)
+            if (localPath != null && loadFile(tv, localPath)) return
             if (payload == null || payload.isEmpty()) return
-
-            val text = try {
-                String(payload, StandardCharsets.UTF_8)
-            } catch (_: Throwable) {
-                ""
-            }
-
+            val text = try { String(payload, StandardCharsets.UTF_8) } catch (_: Throwable) { "" }
             val local = PATH_RE.find(text)?.value?.let { cleanPath(it) }
             if (local != null && loadFile(tv, local)) return
-
             val url = URL_RE.find(text)?.value
             if (url != null) loadUrl(tv, url)
         } catch (t: Throwable) {

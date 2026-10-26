@@ -75,6 +75,9 @@ object Prefs {
     const val K_BEAUTY_FORCE_TIME = "beauty_force_time"
     const val K_BEAUTY_TIME_SECONDS = "beauty_time_seconds"
     const val K_BEAUTY_FORCE_IP = "beauty_force_ip"
+    const val K_CONFIRM_LIKE = "confirm_like"
+    const val K_CONFIRM_COLLECT = "confirm_collect"
+    const val K_CONFIRM_FOLLOW = "confirm_follow"
     const val K_DL_PATH = "dl_path"
     const val DEFAULT_PATH = "/sdcard/Download"
 

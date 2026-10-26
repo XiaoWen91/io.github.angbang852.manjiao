@@ -32,6 +32,7 @@ object BeautifyHooks {
     private var loader: ClassLoader? = null
     private var lastPhoto: Any? = null
     private var lastCaptionSeen = 0L
+    private var lastCaptionView: java.lang.ref.WeakReference<TextView>? = null
 
     fun hook(module: XposedModule, cl: ClassLoader) {
         loader = cl
@@ -411,6 +412,7 @@ object BeautifyHooks {
                         rightTagged[ll] = true
                         rightContainers[ll] = true
                         applyRightContainer(ll)
+                        applyPlayAlpha(null)
                         ll.postDelayed({ applyRightContainer(ll) }, 300L)
                     }
                 } catch (_: Throwable) {
@@ -426,6 +428,7 @@ object BeautifyHooks {
                     val ll = self?.javaClass?.getMethod("l")?.invoke(self) as? ViewGroup
                     if (ll != null && rightTagged.containsKey(ll)) {
                         applyRightContainer(ll)
+                        applyPlayAlpha(null)
                         ll.postDelayed({ applyRightContainer(ll) }, 200L)
                     }
                 } catch (_: Throwable) {
@@ -439,7 +442,10 @@ object BeautifyHooks {
                     try {
                         val self = chain.thisObject
                         val ll = self?.javaClass?.getMethod("l")?.invoke(self) as? ViewGroup
-                        if (ll != null && rightTagged.containsKey(ll)) applyRightContainer(ll)
+                        if (ll != null && rightTagged.containsKey(ll)) {
+                            applyRightContainer(ll)
+                            applyPlayAlpha(null)
+                        }
                     } catch (_: Throwable) {
                     }
                     r
@@ -725,6 +731,8 @@ object BeautifyHooks {
                 try {
                     val tv = chain.thisObject as? TextView
                     if (tv != null) {
+                        lastCaptionSeen = System.currentTimeMillis()
+                        lastCaptionView = java.lang.ref.WeakReference(tv)
                         uiRoots[tv] = "caption"
                         applyPlayAlpha(null)
                         applyCaptionTo(tv)
@@ -746,7 +754,10 @@ object BeautifyHooks {
             if (!Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) && !Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false)) return
             val add = captionExtra(photo)
             if (add.isBlank()) return
-            val old = tv.text?.toString().orEmpty()
+            val rawOld = tv.text?.toString().orEmpty()
+            val old = rawOld.lineSequence().filterNot { line ->
+                line.matches(Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.*""")) || line.contains("IP:")
+            }.joinToString("\n").trimEnd()
             if (old.contains(add)) return
             val sb = android.text.SpannableStringBuilder()
             if (old.isNotEmpty()) sb.append(old).append('\n')
@@ -771,9 +782,20 @@ object BeautifyHooks {
             install(module, m, "beauty.caption.username.fallback") { chain ->
                 val r = chain.proceed()
                 try {
-                    if (lastPhoto != null && System.currentTimeMillis() - lastCaptionSeen > 800 &&
+                    val self = chain.thisObject
+                    for (n in arrayOf("g", "i", "k")) {
+                        try {
+                            val f = c.getDeclaredField(n)
+                            f.isAccessible = true
+                            val v = f.get(self) as? TextView
+                            if (v != null) uiRoots[v] = "caption"
+                        } catch (_: Throwable) {
+                        }
+                    }
+                    applyPlayAlpha(null)
+                    if (lastPhoto != null && lastCaptionView?.get()?.isAttachedToWindow != true &&
+                        System.currentTimeMillis() - lastCaptionSeen > 800 &&
                         (Prefs.bool(Prefs.K_BEAUTY_FORCE_TIME, false) || Prefs.bool(Prefs.K_BEAUTY_FORCE_IP, false))) {
-                        val self = chain.thisObject
                         var tv: TextView? = null
                         for (n in arrayOf("i", "k")) {
                             try {
@@ -869,7 +891,7 @@ object BeautifyHooks {
                         uiRoots[v] = "top"
                         var p = v.parent as? View
                         var depth = 0
-                        while (p != null && depth < 2) {
+                        while (p != null && depth < 5) {
                             uiRoots[p] = "topParent"
                             p = p.parent as? View
                             depth++
@@ -885,7 +907,7 @@ object BeautifyHooks {
             val i2 = Class.forName("t6h.i2", false, cl)
             val accept = i2.getDeclaredMethod("accept", Any::class.java)
             install(module, accept, "beauty.play.alpha.apply") { chain ->
-                val playing = isPlaying()
+                val playing = !isPlaying()
                 val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
                 var raw = Prefs.str(key, "")
                 if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")
@@ -901,7 +923,7 @@ object BeautifyHooks {
 
     private fun applyPlayAlpha(observed: Float?) {
         try {
-            val playing = isPlaying()
+            val playing = !isPlaying()
             val key = if (playing) Prefs.K_BEAUTY_ALPHA_PLAYING else Prefs.K_BEAUTY_ALPHA_PAUSED
             var raw = Prefs.str(key, "")
             if (raw.isBlank()) raw = Prefs.str(Prefs.K_BEAUTY_PLAY_ALPHA, "")

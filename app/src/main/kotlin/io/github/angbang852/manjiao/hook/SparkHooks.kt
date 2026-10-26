@@ -29,6 +29,7 @@ object SparkHooks {
     fun hook(module: XposedModule, cl: ClassLoader) {
         SparkSender.attach(cl)
         BeautifyHooks.hook(module, cl)
+        ConfirmActionHooks.hook(module, cl)
         hookNoSplash(module, cl)
         hookNoRead(module, cl)
         hookExactTime(module, cl)
@@ -118,12 +119,12 @@ object SparkHooks {
             for (m in c.declaredMethods) {
                 val p = m.parameterTypes
                 if (m.returnType != Void.TYPE || p.size != 2) continue
-                if (p[0] != Long::class.javaPrimitiveType || p[1] != Long::class.javaPrimitiveType) continue
+                if (p[1] != Long::class.javaPrimitiveType) continue
                 if (m.name == "U") {
                     target = m
                     break
                 }
-                if (fallback == null) fallback = m
+                if (fallback == null && p[0] == Long::class.javaPrimitiveType) fallback = m
             }
             val m = target ?: fallback ?: return
             install(module, m, "spark.no_read") { chain ->
@@ -223,7 +224,9 @@ object SparkHooks {
             val r = Class.forName("com.kwai.imsdk.msg.RecalledMsg", false, cl)
             val origin = r.getDeclaredMethod("getOriginMsg")
             install(module, origin, "spark.anti_recall.origin") { chain ->
-                chain.proceed()
+                val res = chain.proceed()
+                try { SparkRecallCache.remember(res) } catch (_: Throwable) {}
+                res
             }
 
             val notice = r.getDeclaredMethod("getNotice")
@@ -274,6 +277,7 @@ object SparkHooks {
                                 } catch (_: Throwable) {
                                     null
                                 }
+                                val cached = if (origin == null) SparkRecallCache.resolveFrom(msg) else null
                                 var text = ""
                                 if (origin != null) {
                                     text = try {
@@ -288,11 +292,14 @@ object SparkHooks {
                                             ""
                                         }
                                     }
+                                } else if (cached != null) {
+                                    text = if (cached.text.isNotEmpty()) cached.text else cached.summary
                                 }
                                 val tv = findBubbleText(chain.thisObject, holder)
                                 if (tv != null) {
                                     tv.text = if (text.isNotEmpty()) text else "这条消息已撤回"
                                     if (origin != null) SparkRecallMedia.attach(tv, origin)
+                                    else if (cached != null) SparkRecallMedia.attach(tv, cached.payload, cached.localPath)
                                 }
                             } catch (_: Throwable) {
                             }

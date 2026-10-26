@@ -64,6 +64,11 @@ object BeautifyUi {
         root.addView(toggleRow(ctx, "时间精确到秒", Prefs.K_BEAUTY_TIME_SECONDS, true))
         root.addView(toggleRow(ctx, "强制显示 IP 属地", Prefs.K_BEAUTY_FORCE_IP, false))
 
+        root.addView(section(ctx, "操作确认"))
+        root.addView(toggleRow(ctx, "点赞前确认", Prefs.K_CONFIRM_LIKE, false))
+        root.addView(toggleRow(ctx, "收藏前确认", Prefs.K_CONFIRM_COLLECT, false))
+        root.addView(toggleRow(ctx, "关注前确认", Prefs.K_CONFIRM_FOLLOW, false))
+
         root.addView(section(ctx, "播放 UI"))
         root.addView(row(ctx, "播放/暂停 UI 透明度", alphaSummary(ctx)) { alphaDialog(ctx) })
         root.addView(toggleRow(ctx, "去除全屏观看按钮", Prefs.K_BEAUTY_NO_FULLSCREEN, false))
