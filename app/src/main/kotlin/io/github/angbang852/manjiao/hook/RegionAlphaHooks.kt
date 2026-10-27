@@ -188,13 +188,45 @@ object RegionAlphaHooks {
 
     fun apply(root: View?) {
         if (root == null) return
+        if (isCommentOrMessageShown(root)) return
+        if (!hasVideoMarker(root)) return
         lastRoot = java.lang.ref.WeakReference(root)
         try {
-            val skip = applyKnown(root)
-            walk(root, PlaybackState.isPlaying(), Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false), skip)
+            applyKnown(root)
         } catch (t: Throwable) {
             Logger.d("kira region alpha apply miss: ${t.message}")
         }
+    }
+
+    private fun isPhotoDetail(root: View): Boolean {
+        var c: android.content.Context? = root.context
+        while (c is android.content.ContextWrapper) {
+            if (c is android.app.Activity) break
+            c = c.baseContext
+        }
+        val n = (c as? android.app.Activity)?.javaClass?.name.orEmpty()
+        return n.contains("PhotoDetailActivity")
+    }
+
+    private fun hasVideoMarker(root: View): Boolean {
+        if (findByName(root, "right_action_group") != null) return true
+        if (findByName(root, "bottom_bar_shoot") != null) return true
+        if (findByName(root, "caption_container") != null) return true
+        return findByClass(root, "CaptionTextView") != null
+    }
+
+    private fun findByClass(v: View, name: String): View? {
+        if (v.javaClass.name.contains(name)) return v
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) findByClass(v.getChildAt(i), name)?.let { return it }
+        }
+        return null
+    }
+
+    private fun isCommentOrMessageShown(root: View): Boolean {
+        val c = findByName(root, "comment_container") ?: findByName(root, "comment_editor_container")
+        if (c != null && c.isShown) return true
+        return false
     }
 
     private fun applyKnown(root: View): MutableSet<View> {
@@ -260,10 +292,11 @@ object RegionAlphaHooks {
     private fun regionKey(v: View): String {
         val cls = v.javaClass.name.lowercase()
         val id = resName(v)?.lowercase().orEmpty()
-        if (cls.contains("caption") || cls.contains("username") || id.contains("caption") || id.contains("title") || id.contains("username")) return Prefs.K_BEAUTY_ALPHA_TEXT
-        if (cls.contains("bottom") || id.contains("bottom") || id.contains("tab")) return Prefs.K_BEAUTY_ALPHA_BOTTOM
-        if (cls.contains("right") || cls.contains("action") || id.contains("right") || id.contains("action")) return Prefs.K_BEAUTY_ALPHA_RIGHT
-        if (cls.contains("top") || cls.contains("tabstrip") || id.contains("top") || id.contains("status")) return Prefs.K_BEAUTY_ALPHA_TOP
+        if (id.contains("comment") || id.contains("message") || cls.contains("comment") || cls.contains("message")) return ""
+        if (cls.contains("captiontextview") || cls.contains("usernamelinearlayout") || id.contains("caption") || id.contains("username")) return Prefs.K_BEAUTY_ALPHA_TEXT
+        if (id == "bottom_bar_container" || id == "bottom_bar" || id == "main_tab_container" || id == "bottom_bar_shoot") return Prefs.K_BEAUTY_ALPHA_BOTTOM
+        if (id == "right_action_group" || id == "group_right_action_bar_root_layout" || id == "right_action_bar") return Prefs.K_BEAUTY_ALPHA_RIGHT
+        if (id == "top_bar_container" || id == "tab_strip" || id == "tab_layout" || id == "alpha_top_bar") return Prefs.K_BEAUTY_ALPHA_TOP
         return ""
     }
 
