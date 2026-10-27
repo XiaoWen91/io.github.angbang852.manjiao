@@ -3,7 +3,9 @@ package io.github.angbang852.manjiao.hook
 import android.app.Activity
 import android.app.Dialog
 import android.graphics.Color
+import android.graphics.drawable.ClipDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -56,6 +58,11 @@ object RegionAlphaHooks {
         try {
             if (panel?.isShowing == true) return
             val d = Dialog(act)
+            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            d.window?.setDimAmount(0.35f)
+            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            d.window?.setGravity(android.view.Gravity.CENTER)
             val box = LinearLayout(act).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(act, 18), dp(act, 18), dp(act, 18), dp(act, 14))
@@ -86,7 +93,11 @@ object RegionAlphaHooks {
                 fun syncLabel(p: Int) { label.text = "$title  ${p}%" }
                 val cur = ((Prefs.str(key, "1.00").toFloatOrNull() ?: 1f) * 100).toInt().coerceIn(0, 100)
                 syncLabel(cur)
-                val sb = SeekBar(act).apply { max = 100; progress = cur }
+                val sb = SeekBar(act).apply {
+                    max = 100
+                    progress = cur
+                }
+                styleSeekBar(act, sb)
                 sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                     override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
                         syncLabel(p)
@@ -165,6 +176,32 @@ object RegionAlphaHooks {
 
     private fun alpha(key: String): Float =
         Prefs.str(key, "1.00").toFloatOrNull()?.coerceIn(0f, 1f) ?: 1f
+
+    private fun styleSeekBar(ctx: android.content.Context, sb: SeekBar) {
+        try {
+            val track = GradientDrawable().apply {
+                cornerRadius = dp(ctx, 4).toFloat()
+                setColor(0xFFE2E8F0.toInt())
+            }
+            val progress = GradientDrawable().apply {
+                cornerRadius = dp(ctx, 4).toFloat()
+                setColor(0xFFFF6A00.toInt())
+            }
+            val clip = ClipDrawable(progress, Gravity.LEFT, ClipDrawable.HORIZONTAL)
+            val layer = LayerDrawable(arrayOf(track, clip))
+            layer.setId(0, android.R.id.background)
+            layer.setId(1, android.R.id.progress)
+            sb.progressDrawable = layer
+            sb.thumb = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.WHITE)
+                setStroke(dp(ctx, 2), 0xFFFF6A00.toInt())
+            }
+            sb.thumbOffset = dp(ctx, 8)
+            sb.setSplitTrack(false)
+        } catch (_: Throwable) {
+        }
+    }
 
     private fun dp(ctx: android.content.Context, v: Int): Int =
         (v * ctx.resources.displayMetrics.density).toInt()

@@ -2,6 +2,7 @@ package io.github.angbang852.manjiao.hook
 
 import android.app.Activity
 import android.app.Dialog
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -10,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import io.github.angbang852.manjiao.data.Prefs
 import io.github.angbang852.manjiao.util.Logger
@@ -52,11 +54,18 @@ object ScanHideHooks {
         module.hook(m).setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE).setId(id).intercept(hooker)
     }
 
+    private fun isHiddenToken(v: View, token: String, hidden: Set<String>): Boolean {
+        if (hidden.contains(token)) return true
+        val label = labelFor(v)
+        return label.isNotEmpty() && hidden.contains("text:$label")
+    }
+
     fun apply(root: View?) {
         if (root == null) return
         val hidden = hiddenSet()
         try {
             walkApply(root, hidden)
+            BottomBarAligner.align(root)
         } catch (t: Throwable) {
             Logger.d("kira scan apply miss: ${t.message}")
         }
@@ -65,8 +74,9 @@ object ScanHideHooks {
     private fun walkApply(v: View, hidden: Set<String>) {
         if (v.tag == TAG_OVERLAY) return
         val token = tokenFor(v)
+        val isHidden = isHiddenToken(v, token, hidden)
         if (token.isNotEmpty()) {
-            if (hidden.contains(token)) {
+            if (isHidden) {
                 if (!hiddenByUs.containsKey(v)) {
                     originalVis[v] = v.visibility
                     hiddenByUs[v] = token
@@ -87,8 +97,12 @@ object ScanHideHooks {
     fun showPanel(act: Activity) {
         try {
             if (panel?.isShowing == true) return
-            val root = act.window?.decorView ?: return
             val d = Dialog(act)
+            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            d.window?.setDimAmount(0.35f)
+            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            d.window?.setGravity(android.view.Gravity.CENTER)
             val box = LinearLayout(act).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(act, 16), dp(act, 16), dp(act, 16), dp(act, 12))
@@ -104,22 +118,124 @@ object ScanHideHooks {
                 textSize = 17f
                 setTextColor(0xFF0F172A.toInt())
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            val transBtn = TextView(act).apply {
-                text = "透明度"
+            val scanBtn = TextView(act).apply {
+                text = "⟳ 扫描"
                 textSize = 13f
-                setTextColor(0xFF2563EB.toInt())
+                setTextColor(0xFFFF6A00.toInt())
                 setPadding(dp(act, 12), dp(act, 6), dp(act, 12), dp(act, 6))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(act, 10).toFloat()
-                    setColor(0xFFF1F5F9.toInt())
-                    setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
+                    setColor(0xFFFFF7ED.toInt())
+                    setStroke(dp(act, 1), 0xFFFFD7B5.toInt())
                 }
                 isClickable = true
-                setOnClickListener { RegionAlphaHooks.showPanel(act) }
+                setOnClickListener { d.dismiss(); showScanResultPanel(act) }
             }
-            header.addView(transBtn)
+            header.addView(scanBtn)
+            box.addView(header)
+            val tabs = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(act, 8), 0, dp(act, 6)) }
+            box.addView(tabs)
+            val list = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
+            val scroll = ScrollView(act).apply { isVerticalScrollBarEnabled = false }
+            scroll.addView(list)
+            box.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(act, 420)))
+            var selected = "底栏"
+            val cats = listOf("顶栏", "底栏", "视频控件", "分享面板")
+            fun refresh() {
+                val hidden = hiddenSet()
+                tabs.removeAllViews()
+                for (cat in cats) {
+                    tabs.addView(TextView(act).apply {
+                        text = cat
+                        textSize = 12f
+                        gravity = Gravity.CENTER
+                        setPadding(dp(act, 10), dp(act, 6), dp(act, 10), dp(act, 6))
+                        setTextColor(if (cat == selected) 0xFFFF6A00.toInt() else 0xFF64748B.toInt())
+                        background = GradientDrawable().apply {
+                            cornerRadius = dp(act, 12).toFloat()
+                            setColor(if (cat == selected) 0xFFFFE8D6.toInt() else 0x00FFFFFF)
+                        }
+                        isClickable = true
+                        setOnClickListener { selected = cat; refresh() }
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(act, 4) })
+                }
+                list.removeAllViews()
+                for (label in presetsFor(selected)) {
+                    val token = presetToken(label)
+                    val row = LinearLayout(act).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(dp(act, 10), dp(act, 10), dp(act, 10), dp(act, 10))
+                        background = GradientDrawable().apply {
+                            cornerRadius = dp(act, 14).toFloat()
+                            setColor(Color.WHITE)
+                            setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
+                        }
+                    }
+                    row.addView(TextView(act).apply {
+                        text = label
+                        textSize = 14f
+                        setTextColor(0xFF334155.toInt())
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    row.addView(Switch(act).apply {
+                        showText = false
+                        isChecked = hidden.contains(token)
+                        thumbTintList = ColorStateList.valueOf(0xFFFF6A00.toInt())
+                        trackTintList = ColorStateList.valueOf(0xFFE2E8F0.toInt())
+                        setOnCheckedChangeListener { _, checked ->
+                            setHidden(act, token, checked)
+                            apply(act.window?.decorView)
+                            BottomBarAligner.align(act.window?.decorView)
+                        }
+                    })
+                    list.addView(row)
+                    list.addView(View(act).apply { layoutParams = LinearLayout.LayoutParams(1, dp(act, 6)) })
+                }
+            }
+            refresh()
+            box.addView(TextView(act).apply {
+                text = "关闭"
+                textSize = 14f
+                setTextColor(0xFFFF6A00.toInt())
+                gravity = Gravity.CENTER
+                setPadding(0, dp(act, 12), 0, 0)
+                setOnClickListener { d.dismiss() }
+            })
+            d.setContentView(box)
+            d.setOnDismissListener { panel = null }
+            panel = d
+            d.show()
+        } catch (t: Throwable) {
+            Logger.d("kira scan preset miss: ${t.message}")
+        }
+    }
+
+    fun showScanResultPanel(act: Activity) {
+        try {
+            if (panel?.isShowing == true) return
+            val d = Dialog(act)
+            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            d.window?.setDimAmount(0.35f)
+            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            d.window?.setGravity(android.view.Gravity.CENTER)
+            val box = LinearLayout(act).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(act, 16), dp(act, 16), dp(act, 16), dp(act, 12))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(act, 20).toFloat()
+                    setColor(0xFFF8FAFC.toInt())
+                    setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
+                }
+            }
+            val header = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            header.addView(TextView(act).apply {
+                text = "扫描结果"
+                textSize = 17f
+                setTextColor(0xFF0F172A.toInt())
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             val scanBtn = TextView(act).apply {
-                text = "⟳ 扫描"
+                text = "⟳ 重新扫描"
                 textSize = 13f
                 setTextColor(0xFFFF6A00.toInt())
                 setPadding(dp(act, 12), dp(act, 6), dp(act, 12), dp(act, 6))
@@ -174,14 +290,19 @@ object ScanHideHooks {
                     val row = LinearLayout(act).apply {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER_VERTICAL
-                        setPadding(dp(act, 8), dp(act, 8), dp(act, 8), dp(act, 8))
+                        setPadding(dp(act, 10), dp(act, 10), dp(act, 10), dp(act, 10))
                         background = GradientDrawable().apply {
                             cornerRadius = dp(act, 14).toFloat()
                             setColor(Color.WHITE)
                             setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
                         }
                     }
-                    val cb = CheckBox(act).apply { isChecked = hidden.contains(e.token) }
+                    val cb = Switch(act).apply {
+                        showText = false
+                        isChecked = hidden.contains(e.token)
+                        thumbTintList = ColorStateList.valueOf(0xFFFF6A00.toInt())
+                        trackTintList = ColorStateList.valueOf(0xFFE2E8F0.toInt())
+                    }
                     val label = TextView(act).apply {
                         text = e.label + "\n" + e.token + " · ${e.w}×${e.h}"
                         textSize = 12f
@@ -191,6 +312,7 @@ object ScanHideHooks {
                     cb.setOnCheckedChangeListener { _, checked ->
                         setHidden(act, e.token, checked)
                         apply(act.window?.decorView)
+                        BottomBarAligner.align(act.window?.decorView)
                     }
                     row.addView(cb)
                     row.addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
@@ -213,9 +335,19 @@ object ScanHideHooks {
             panel = d
             d.show()
         } catch (t: Throwable) {
-            Logger.d("kira scan panel miss: ${t.message}")
+            Logger.d("kira scan result miss: ${t.message}")
         }
     }
+
+    private fun presetsFor(cat: String): List<String> = when (cat) {
+        "顶栏" -> listOf("分类", "侧边栏", "王者送福利", "游戏", "玩游戏")
+        "底栏" -> listOf("首页", "发现", "拍摄", "消息", "我", "同城", "精选")
+        "视频控件" -> listOf("头像", "点赞", "评论", "收藏", "分享", "音乐")
+        "分享面板" -> listOf("保存到相册", "下载", "分享到微信", "朋友圈", "QQ", "微博", "复制链接", "举报", "不感兴趣")
+        else -> emptyList()
+    }
+
+    private fun presetToken(label: String): String = "text:$label"
 
     private fun categoryFor(e: Elem, act: Activity): String {
         val s = (e.token + " " + e.label).lowercase()

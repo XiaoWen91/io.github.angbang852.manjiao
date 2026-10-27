@@ -312,6 +312,11 @@ object BeautifyUi {
 
     private fun regionAlphaDialog(ctx: Context) {
         val d = Dialog(ctx)
+        d.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        d.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        d.window?.setDimAmount(0.35f)
+        d.window?.setLayout((ctx.resources.displayMetrics.widthPixels * 0.92f).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
+        d.window?.setGravity(Gravity.CENTER)
         val box = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(ctx, 18), dp(ctx, 18), dp(ctx, 18), dp(ctx, 18))

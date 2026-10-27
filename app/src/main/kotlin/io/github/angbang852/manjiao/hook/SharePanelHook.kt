@@ -159,11 +159,23 @@ object SharePanelHook {
         } catch (_: Throwable) {}
         val open = Runnable {
             try { hostDialog.dismiss() } catch (_: Throwable) {}
-            handler.postDelayed({ MainMenuDialog.show(ctx) }, 120)
+            handler.postDelayed({
+                val act = findActivity(ctx)
+                if (act != null) MainInjectedPanel.showPanel(act) else MainMenuDialog.show(ctx)
+            }, 120)
         }
         anchor.setOnClickListener { open.run() }
         iv?.setOnClickListener { open.run() }
         tv.setOnClickListener { open.run() }
+    }
+
+    private fun findActivity(ctx: Context): android.app.Activity? {
+        var c: android.content.Context? = ctx
+        while (c is android.content.ContextWrapper) {
+            if (c is android.app.Activity) return c
+            c = c.baseContext
+        }
+        return c as? android.app.Activity
     }
 
     private fun findActionAnchor(root: ViewGroup, tv: TextView): View? {
