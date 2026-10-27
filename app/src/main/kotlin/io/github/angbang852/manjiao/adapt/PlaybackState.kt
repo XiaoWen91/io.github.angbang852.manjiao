@@ -43,10 +43,24 @@ package io.github.angbang852.manjiao.adapt
 object PlaybackState {
 
     @Volatile private var playing = false
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(Boolean) -> Unit>()
 
-    fun setPlaying(v: Boolean) { playing = v }
+    fun setPlaying(v: Boolean) {
+        playing = v
+        for (l in listeners) {
+            try { l(v) } catch (_: Throwable) {}
+        }
+    }
 
     fun isPlaying(): Boolean = playing
+
+    fun addListener(l: (Boolean) -> Unit) {
+        listeners.add(l)
+    }
+
+    fun removeListener(l: (Boolean) -> Unit) {
+        listeners.remove(l)
+    }
 
     /** 实例 → 最近一次「播放完成」的时刻 */
     private val completionAt =

@@ -23,8 +23,14 @@ import io.github.libxposed.api.XposedModule
 
 object RegionAlphaHooks {
     private val applied = java.util.WeakHashMap<View, Float>()
+    private var lastRoot: java.lang.ref.WeakReference<View>? = null
+    private var listenerRegistered = false
 
     fun hook(module: XposedModule, cl: ClassLoader) {
+        if (!listenerRegistered) {
+            listenerRegistered = true
+            PlaybackState.addListener { reapplyLast() }
+        }
         for (name in arrayOf("com.yxcorp.gifshow.detail.PhotoDetailActivity", "com.yxcorp.gifshow.HomeActivity")) {
             try {
                 val c = Class.forName(name, false, cl)
@@ -33,7 +39,11 @@ object RegionAlphaHooks {
                     val r = chain.proceed()
                     try {
                         val a = chain.thisObject as? Activity
-                        if (a != null) apply(a.window?.decorView)
+                        if (a != null) {
+                            apply(a.window?.decorView)
+                            a.window?.decorView?.postDelayed({ apply(a.window?.decorView) }, 200L)
+                            a.window?.decorView?.postDelayed({ apply(a.window?.decorView) }, 800L)
+                        }
                     } catch (_: Throwable) {}
                     r
                 }
@@ -46,7 +56,12 @@ object RegionAlphaHooks {
             val m = c.getDeclaredMethod("onMeasure", Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!)
             module.hook(m).setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE).setId("kira.region.alpha.caption").intercept { chain ->
                 val r = chain.proceed()
-                try { apply((chain.thisObject as? View)?.rootView) } catch (_: Throwable) {}
+                try {
+                    val root = (chain.thisObject as? View)?.rootView
+                    apply(root)
+                    root?.postDelayed({ apply(root) }, 150L)
+                    root?.postDelayed({ apply(root) }, 500L)
+                } catch (_: Throwable) {}
                 r
             }
         } catch (t: Throwable) {
@@ -98,11 +113,14 @@ object RegionAlphaHooks {
                     onChanged = { p ->
                         syncLabel(p)
                         val v = p / 100f
-                        Prefs.setStrSync(act, key, String.format(java.util.Locale.US, "%.2f", v))
+                        val text = String.format(java.util.Locale.US, "%.2f", v)
+                        Prefs.setStrSync(act, key, text)
                         previewAlpha(key, v, act.window?.decorView)
                         try {
-                            val i = android.content.Intent(ActivityBridge.ACTION_APPLY_ALPHA)
+                            val i = android.content.Intent(ActivityBridge.ACTION_SET_STR)
                             i.setPackage("com.smile.gifmaker")
+                            i.putExtra("key", key)
+                            i.putExtra("value", text)
                             act.sendBroadcast(i)
                         } catch (_: Throwable) {
                         }
@@ -122,8 +140,17 @@ object RegionAlphaHooks {
                 setTextColor(Color.WHITE)
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             pauseRow.addView(FrostedKit.iosSwitch(act, Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false)) { checked ->
-                Prefs.setBool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, checked)
+                Prefs.setBoolSync(act, Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, checked)
+                try {
+                    val i = android.content.Intent(ActivityBridge.ACTION_SET_BOOL)
+                    i.setPackage("com.smile.gifmaker")
+                    i.putExtra("key", Prefs.K_BEAUTY_ALPHA_PAUSE_RESET)
+                    i.putExtra("value", checked)
+                    act.sendBroadcast(i)
+                } catch (_: Throwable) {
+                }
                 apply(act.window?.decorView)
+                reapplyLast()
             })
             box.addView(pauseRow)
             box.addView(TextView(act).apply {
@@ -155,34 +182,52 @@ object RegionAlphaHooks {
         }
     }
 
+    fun reapplyLast() {
+        lastRoot?.get()?.let { apply(it) }
+    }
+
     fun apply(root: View?) {
         if (root == null) return
+        lastRoot = java.lang.ref.WeakReference(root)
         try {
-            applyKnown(root)
-            walk(root, PlaybackState.isPlaying(), Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false))
+            val skip = applyKnown(root)
+            walk(root, PlaybackState.isPlaying(), Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false), skip)
         } catch (t: Throwable) {
             Logger.d("kira region alpha apply miss: ${t.message}")
         }
     }
 
-    private fun applyKnown(root: View) {
+    private fun applyKnown(root: View): MutableSet<View> {
+        val appliedNow = HashSet<View>()
         val playing = PlaybackState.isPlaying()
         val reset = Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false)
-        fun apply(name: String, key: String) {
-            findByName(root, name)?.let { v ->
-                val a = if (!playing && reset) 1f else alpha(key)
-                if (a < 0.999f) {
-                    applied[v] = a
-                    v.alpha = a
-                } else if (applied.remove(v) != null) {
-                    v.alpha = 1f
+
+        fun setOne(v: View, key: String) {
+            val a = if (!playing && reset) 1f else alpha(key)
+            if (a < 0.999f) {
+                applied[v] = a
+                v.alpha = a
+            } else if (applied.remove(v) != null) {
+                v.alpha = 1f
+            }
+            appliedNow.add(v)
+        }
+
+        fun applyFirst(names: List<String>, key: String) {
+            for (name in names) {
+                val v = findByName(root, name)
+                if (v != null) {
+                    setOne(v, key)
+                    break
                 }
             }
         }
-        apply("bottom_bar_container", Prefs.K_BEAUTY_ALPHA_BOTTOM)
-        apply("right_action_group", Prefs.K_BEAUTY_ALPHA_RIGHT)
-        apply("title_root", Prefs.K_BEAUTY_ALPHA_TEXT)
-        apply("top_bar_container", Prefs.K_BEAUTY_ALPHA_TOP)
+
+        applyFirst(listOf("bottom_bar_container", "bottom_bar"), Prefs.K_BEAUTY_ALPHA_BOTTOM)
+        applyFirst(listOf("right_action_group", "group_right_action_bar_root_layout", "right_action_bar"), Prefs.K_BEAUTY_ALPHA_RIGHT)
+        applyFirst(listOf("title_root", "caption_container"), Prefs.K_BEAUTY_ALPHA_TEXT)
+        applyFirst(listOf("top_bar_container", "tab_strip", "tab_layout"), Prefs.K_BEAUTY_ALPHA_TOP)
+        return appliedNow
     }
 
     private fun findByName(v: View, name: String): View? {
@@ -193,7 +238,8 @@ object RegionAlphaHooks {
         return null
     }
 
-    private fun walk(v: View, playing: Boolean, reset: Boolean) {
+    private fun walk(v: View, playing: Boolean, reset: Boolean, skip: Set<View>) {
+        if (skip.contains(v)) return
         if (v.tag == "kira_scan_overlay") return
         val key = regionKey(v)
         if (key.isNotEmpty()) {
@@ -207,7 +253,7 @@ object RegionAlphaHooks {
             return
         }
         if (v is ViewGroup) {
-            for (i in 0 until v.childCount) walk(v.getChildAt(i), playing, reset)
+            for (i in 0 until v.childCount) walk(v.getChildAt(i), playing, reset, skip)
         }
     }
 
