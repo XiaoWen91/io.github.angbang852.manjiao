@@ -20,7 +20,7 @@ object ActivityBridge {
             val act = current?.get() ?: return
             when (intent?.action) {
                 ACTION_SHOW_SCAN -> act.runOnUiThread { ScanHideHooks.showPanel(act) }
-                ACTION_SHOW_MAIN -> act.runOnUiThread { MainInjectedPanel.showPanel(act) }
+                ACTION_SHOW_MAIN -> act.runOnUiThread { io.github.angbang852.manjiao.ui.MainMenuDialog.show(act) }
             }
         }
     }

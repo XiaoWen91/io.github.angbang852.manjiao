@@ -41,6 +41,9 @@ object BeautifyHooks {
     fun hook(module: XposedModule, cl: ClassLoader) {
         loader = cl
         hookDpi(module)
+        hookBottomBar(module, cl)
+        hookBottomReorder(module, cl)
+        hookBottomShoot(module, cl)
         hookRightActionBar(module, cl)
         hookPendant(module, cl)
         hookFullscreen(module, cl)
@@ -50,6 +53,7 @@ object BeautifyHooks {
         hookOfficialDate(module, cl)
         hookCaptionTextView(module, cl)
         hookUserNameFallback(module, cl)
+        hookPlaybackAlpha(module, cl)
         hookPlayerState(module, cl)
         ScanHideHooks.hook(module, cl)
         BottomBarAligner.hook(module, cl)

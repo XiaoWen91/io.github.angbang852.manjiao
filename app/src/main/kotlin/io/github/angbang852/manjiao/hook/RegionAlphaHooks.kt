@@ -15,6 +15,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import io.github.angbang852.manjiao.adapt.PlaybackState
 import io.github.angbang852.manjiao.data.Prefs
+import io.github.angbang852.manjiao.ui.FrostedKit
 import io.github.angbang852.manjiao.util.Logger
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -57,25 +58,11 @@ object RegionAlphaHooks {
     fun showPanel(act: Activity) {
         try {
             if (panel?.isShowing == true) return
-            val d = Dialog(act)
-            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            d.window?.setDimAmount(0.35f)
-            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
-            d.window?.setGravity(android.view.Gravity.CENTER)
-            val box = LinearLayout(act).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(act, 18), dp(act, 18), dp(act, 18), dp(act, 14))
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(act, 20).toFloat()
-                    setColor(0xFFF8FAFC.toInt())
-                    setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
-                }
-            }
+            val (d, box) = FrostedKit.dialog(act)
             box.addView(TextView(act).apply {
                 text = "区域透明度"
                 textSize = 17f
-                setTextColor(0xFF0F172A.toInt())
+                setTextColor(Color.WHITE)
                 setPadding(0, 0, 0, dp(act, 10))
             })
             val specs = listOf(
@@ -87,7 +74,7 @@ object RegionAlphaHooks {
             for ((title, key) in specs) {
                 val label = TextView(act).apply {
                     textSize = 13f
-                    setTextColor(0xFF334155.toInt())
+                    setTextColor(Color.WHITE)
                     setPadding(0, dp(act, 6), 0, 0)
                 }
                 fun syncLabel(p: Int) { label.text = "$title  ${p}%" }
@@ -110,17 +97,21 @@ object RegionAlphaHooks {
                 box.addView(label)
                 box.addView(sb)
             }
-            val cb = CheckBox(act).apply {
+            val pauseRow = LinearLayout(act).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(act, 8), 0, 0)
+            }
+            pauseRow.addView(TextView(act).apply {
                 text = "暂停时恢复默认透明度"
                 textSize = 13f
-                setTextColor(0xFF334155.toInt())
-                isChecked = Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false)
-            }
-            cb.setOnCheckedChangeListener { _, checked ->
+                setTextColor(Color.WHITE)
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            pauseRow.addView(FrostedKit.iosSwitch(act, Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false)) { checked ->
                 Prefs.setBool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, checked)
                 apply(act.window?.decorView)
-            }
-            box.addView(cb)
+            })
+            box.addView(pauseRow)
             box.addView(TextView(act).apply {
                 text = "关闭"
                 textSize = 14f
@@ -181,7 +172,7 @@ object RegionAlphaHooks {
         try {
             val track = GradientDrawable().apply {
                 cornerRadius = dp(ctx, 4).toFloat()
-                setColor(0xFFE2E8F0.toInt())
+                setColor(0x33FFFFFF.toInt())
             }
             val progress = GradientDrawable().apply {
                 cornerRadius = dp(ctx, 4).toFloat()

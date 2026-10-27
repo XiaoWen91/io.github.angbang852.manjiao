@@ -14,6 +14,7 @@ import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 import io.github.angbang852.manjiao.data.Prefs
+import io.github.angbang852.manjiao.ui.FrostedKit
 import io.github.angbang852.manjiao.util.Logger
 
 object MainInjectedPanel {
@@ -22,30 +23,16 @@ object MainInjectedPanel {
     fun showPanel(act: Activity) {
         try {
             if (panel?.isShowing == true) return
-            val d = Dialog(act)
-            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            d.window?.setDimAmount(0.35f)
-            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
-            d.window?.setGravity(android.view.Gravity.CENTER)
-            val box = LinearLayout(act).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(act, 16), dp(act, 16), dp(act, 16), dp(act, 12))
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(act, 20).toFloat()
-                    setColor(0xFFF8FAFC.toInt())
-                    setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
-                }
-            }
+            val (d, box) = FrostedKit.dialog(act)
             box.addView(TextView(act).apply {
                 text = "快手助手"
                 textSize = 22f
-                setTextColor(0xFF0F172A.toInt())
+                setTextColor(Color.WHITE)
             })
             box.addView(TextView(act).apply {
                 text = "KiraTools"
                 textSize = 12.5f
-                setTextColor(0xFF64748B.toInt())
+                setTextColor(0xB3FFFFFF.toInt())
                 setPadding(0, dp(act, 2), 0, dp(act, 10))
             })
 
@@ -94,25 +81,11 @@ object MainInjectedPanel {
 
     private fun showShareHidePanel(act: Activity) {
         try {
-            val d = Dialog(act)
-            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            d.window?.setDimAmount(0.35f)
-            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
-            d.window?.setGravity(android.view.Gravity.CENTER)
-            val box = LinearLayout(act).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(act, 16), dp(act, 16), dp(act, 16), dp(act, 12))
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(act, 20).toFloat()
-                    setColor(0xFFF8FAFC.toInt())
-                    setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
-                }
-            }
+            val (d, box) = FrostedKit.dialog(act)
             box.addView(TextView(act).apply {
                 text = "分享面板隐藏项"
                 textSize = 17f
-                setTextColor(0xFF0F172A.toInt())
+                setTextColor(Color.WHITE)
                 setPadding(0, 0, 0, dp(act, 10))
             })
             val items = listOf("保存到相册", "下载", "分享到微信", "朋友圈", "QQ", "微博", "复制链接", "举报", "不感兴趣")
@@ -126,18 +99,12 @@ object MainInjectedPanel {
                 row.addView(TextView(act).apply {
                     text = label
                     textSize = 14f
-                    setTextColor(0xFF334155.toInt())
+                    setTextColor(Color.WHITE)
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                row.addView(Switch(act).apply {
-                    showText = false
-                    isChecked = set.contains(label)
-                    thumbTintList = ColorStateList.valueOf(0xFFFF6A00.toInt())
-                    trackTintList = ColorStateList.valueOf(0xFFE2E8F0.toInt())
-                    setOnCheckedChangeListener { _, checked ->
-                        if (checked) set.add(label) else set.remove(label)
-                        Prefs.setStr(Prefs.K_BEAUTY_SHARE_HIDE, set.joinToString(","))
-                        ShareItemHideHook.apply(act.window?.decorView)
-                    }
+                row.addView(FrostedKit.iosSwitch(act, set.contains(label)) { checked ->
+                    if (checked) set.add(label) else set.remove(label)
+                    Prefs.setStr(Prefs.K_BEAUTY_SHARE_HIDE, set.joinToString(","))
+                    ShareItemHideHook.apply(act.window?.decorView)
                 })
                 box.addView(row)
             }
@@ -161,8 +128,8 @@ object MainInjectedPanel {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 cornerRadius = dp(act, 18).toFloat()
-                setColor(Color.WHITE)
-                setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
+                setColor(0x22FFFFFF.toInt())
+                setStroke(dp(act, 1), 0x33FFFFFF.toInt())
             }
         }
         val header = LinearLayout(act).apply {
@@ -174,12 +141,12 @@ object MainInjectedPanel {
         header.addView(TextView(act).apply {
             text = title
             textSize = 15.5f
-            setTextColor(0xFF0F172A.toInt())
+            setTextColor(Color.WHITE)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val chevron = TextView(act).apply {
             text = if (expanded) "⌃" else "⌄"
             textSize = 14f
-            setTextColor(0xFF64748B.toInt())
+            setTextColor(0xB3FFFFFF.toInt())
         }
         header.addView(chevron)
         val body = LinearLayout(act).apply {
@@ -207,14 +174,10 @@ object MainInjectedPanel {
         row.addView(TextView(act).apply {
             text = title
             textSize = 15f
-            setTextColor(0xFF334155.toInt())
+            setTextColor(Color.WHITE)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        row.addView(Switch(act).apply {
-            showText = false
-            isChecked = Prefs.bool(key, false)
-            thumbTintList = ColorStateList.valueOf(0xFFFF6A00.toInt())
-            trackTintList = ColorStateList.valueOf(0xFFE2E8F0.toInt())
-            setOnCheckedChangeListener { _, checked -> Prefs.setBool(key, checked) }
+        row.addView(FrostedKit.iosSwitch(act, Prefs.bool(key, false)) { checked ->
+            Prefs.setBool(key, checked)
         })
         return row
     }
@@ -228,7 +191,7 @@ object MainInjectedPanel {
         row.addView(TextView(act).apply {
             text = title
             textSize = 15f
-            setTextColor(0xFF334155.toInt())
+            setTextColor(Color.WHITE)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(pillButton(act, buttonText, onClick))
         return row
@@ -239,13 +202,13 @@ object MainInjectedPanel {
             this.text = text
             textSize = 13f
             gravity = Gravity.CENTER
-            setTextColor(0xFF334155.toInt())
+            setTextColor(Color.WHITE)
             setPadding(dp(act, 14), dp(act, 8), dp(act, 14), dp(act, 8))
             isClickable = true
             background = GradientDrawable().apply {
                 cornerRadius = dp(act, 10).toFloat()
-                setColor(0xFFF1F5F9.toInt())
-                setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
+                setColor(0x22FFFFFF.toInt())
+                setStroke(dp(act, 1), 0x33FFFFFF.toInt())
             }
             setOnClickListener { onClick() }
         }

@@ -330,6 +330,10 @@ object MainMenuDialog {
 
     // ==================== 增强功能 ====================
 
+    fun showBeautifySub(ctx: Context, title: String, body: View) {
+        showSheetScroll(ctx, title, { showBeautify(ctx) }, body)
+    }
+
     private fun showEnhanced(ctx: Context) {
         val body = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         body.addView(noteRow(ctx, "增强功能", "开关即时生效。"))

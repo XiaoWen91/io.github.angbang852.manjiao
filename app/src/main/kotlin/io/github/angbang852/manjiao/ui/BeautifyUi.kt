@@ -37,16 +37,41 @@ object BeautifyUi {
     private val SHARE_ITEMS = listOf("保存到相册", "下载", "分享到微信", "朋友圈", "QQ", "微博", "复制链接", "举报", "不感兴趣")
 
     fun build(ctx: Context): LinearLayout {
-        val root = LinearLayout(ctx).apply {
+        val root = page(ctx)
+        root.addView(section(ctx, "全局"))
+        root.addView(row(ctx, "全局 DPI", value(ctx, Prefs.K_BEAUTY_DPI, "默认")) { dpiDialog(ctx) })
+
+        root.addView(section(ctx, "界面"))
+        root.addView(row(ctx, "底栏", "进入") { MainMenuDialog.showBeautifySub(ctx, "底栏", buildBottom(ctx)) })
+        root.addView(row(ctx, "视频页右侧", "进入") { MainMenuDialog.showBeautifySub(ctx, "视频页右侧", buildRight(ctx)) })
+        root.addView(row(ctx, "文案信息", "进入") { MainMenuDialog.showBeautifySub(ctx, "文案信息", buildCaption(ctx)) })
+        root.addView(row(ctx, "播放 UI", "进入") { MainMenuDialog.showBeautifySub(ctx, "播放 UI", buildPlayback(ctx)) })
+
+        root.addView(section(ctx, "功能"))
+        root.addView(row(ctx, "操作确认", "进入") { MainMenuDialog.showBeautifySub(ctx, "操作确认", buildConfirm(ctx)) })
+        root.addView(row(ctx, "分享面板", "进入") { MainMenuDialog.showBeautifySub(ctx, "分享面板", buildShare(ctx)) })
+        return root
+    }
+
+    private fun page(ctx: Context): LinearLayout =
+        LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(ctx, 8), 0, dp(ctx, 8), dp(ctx, 8))
         }
 
-        root.addView(section(ctx, "全局"))
-        root.addView(row(ctx, "全局 DPI", value(ctx, Prefs.K_BEAUTY_DPI, "默认")) { dpiDialog(ctx) })
-
+    private fun buildBottom(ctx: Context): LinearLayout {
+        val root = page(ctx)
         root.addView(section(ctx, "底栏"))
-        root.addView(row(ctx, "隐藏 Tab / 视频控件", "点击打开") {
+        root.addView(row(ctx, "隐藏组件", value(ctx, Prefs.K_BEAUTY_BOTTOM_HIDE, "未设置")) {
+            checklist(ctx, "底栏隐藏组件", Prefs.K_BEAUTY_BOTTOM_HIDE, BOTTOM_ITEMS)
+        })
+        root.addView(row(ctx, "替换文字", value(ctx, Prefs.K_BEAUTY_BOTTOM_TEXT, "未设置")) {
+            replaceDialog(ctx, "底栏替换文字", Prefs.K_BEAUTY_BOTTOM_TEXT, BOTTOM_ITEMS)
+        })
+        root.addView(toggleRow(ctx, "底栏美化（加号放右，其他放左）", Prefs.K_BEAUTY_BOTTOM_STYLE, false))
+        root.addView(toggleRow(ctx, "底栏透明", Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false))
+        root.addView(toggleRow(ctx, "底栏自适应（隐藏后加号居中）", Prefs.K_BEAUTY_BOTTOM_AUTO, true))
+        root.addView(row(ctx, "隐藏 Tab / 视频控件（扫描）", "打开") {
             try {
                 val i = android.content.Intent(io.github.angbang852.manjiao.hook.ActivityBridge.ACTION_SHOW_SCAN)
                 i.setPackage("com.smile.gifmaker")
@@ -54,35 +79,52 @@ object BeautifyUi {
             } catch (_: Throwable) {
             }
         })
-        root.addView(toggleRow(ctx, "底栏自适应（隐藏后加号居中）", Prefs.K_BEAUTY_BOTTOM_AUTO, true))
-        root.addView(toggleRow(ctx, "底栏透明", Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false))
+        return root
+    }
 
+    private fun buildRight(ctx: Context): LinearLayout {
+        val root = page(ctx)
         root.addView(section(ctx, "视频页右侧"))
         root.addView(row(ctx, "隐藏组件", value(ctx, Prefs.K_BEAUTY_RIGHT_HIDE, "未设置")) {
             checklist(ctx, "右侧隐藏组件", Prefs.K_BEAUTY_RIGHT_HIDE, RIGHT_COMPONENTS.map { it.first })
         })
         root.addView(row(ctx, "修改偏移 / 缩放", "整体") { rightOffsetDialog(ctx) })
+        return root
+    }
 
+    private fun buildCaption(ctx: Context): LinearLayout {
+        val root = page(ctx)
         root.addView(section(ctx, "文案信息"))
         root.addView(toggleRow(ctx, "实验性：官方时间/IP（create_date_tv）", Prefs.K_BEAUTY_OFFICIAL_DATE, false))
+        return root
+    }
 
+    private fun buildConfirm(ctx: Context): LinearLayout {
+        val root = page(ctx)
         root.addView(section(ctx, "操作确认"))
         root.addView(toggleRow(ctx, "点赞前确认", Prefs.K_CONFIRM_LIKE, false))
         root.addView(toggleRow(ctx, "收藏前确认", Prefs.K_CONFIRM_COLLECT, false))
         root.addView(toggleRow(ctx, "关注前确认", Prefs.K_CONFIRM_FOLLOW, false))
+        return root
+    }
 
+    private fun buildPlayback(ctx: Context): LinearLayout {
+        val root = page(ctx)
         root.addView(section(ctx, "播放 UI"))
         root.addView(row(ctx, "区域透明度", "4 区域") { regionAlphaDialog(ctx) })
         root.addView(toggleRow(ctx, "暂停时恢复默认透明度", Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false))
         root.addView(toggleRow(ctx, "全屏隐藏状态栏", Prefs.K_BEAUTY_HIDE_STATUS_BAR, false))
         root.addView(toggleRow(ctx, "去除全屏观看按钮", Prefs.K_BEAUTY_NO_FULLSCREEN, false))
         root.addView(toggleRow(ctx, "去除金币/红包按钮", Prefs.K_BEAUTY_NO_COIN, false))
+        return root
+    }
 
+    private fun buildShare(ctx: Context): LinearLayout {
+        val root = page(ctx)
         root.addView(section(ctx, "分享面板"))
         root.addView(row(ctx, "隐藏项", value(ctx, Prefs.K_BEAUTY_SHARE_HIDE, "未设置")) {
             checklist(ctx, "分享面板隐藏项", Prefs.K_BEAUTY_SHARE_HIDE, SHARE_ITEMS)
         })
-
         return root
     }
 

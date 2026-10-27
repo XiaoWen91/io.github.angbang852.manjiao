@@ -14,6 +14,7 @@ import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 import io.github.angbang852.manjiao.data.Prefs
+import io.github.angbang852.manjiao.ui.FrostedKit
 import io.github.angbang852.manjiao.util.Logger
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -97,26 +98,12 @@ object ScanHideHooks {
     fun showPanel(act: Activity) {
         try {
             if (panel?.isShowing == true) return
-            val d = Dialog(act)
-            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            d.window?.setDimAmount(0.35f)
-            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
-            d.window?.setGravity(android.view.Gravity.CENTER)
-            val box = LinearLayout(act).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(act, 16), dp(act, 16), dp(act, 16), dp(act, 12))
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(act, 20).toFloat()
-                    setColor(0xFFF8FAFC.toInt())
-                    setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
-                }
-            }
+            val (d, box) = FrostedKit.dialog(act)
             val header = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             header.addView(TextView(act).apply {
                 text = "隐藏 Tab / 视频控件"
                 textSize = 17f
-                setTextColor(0xFF0F172A.toInt())
+                setTextColor(Color.WHITE)
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             val scanBtn = TextView(act).apply {
                 text = "⟳ 扫描"
@@ -125,8 +112,8 @@ object ScanHideHooks {
                 setPadding(dp(act, 12), dp(act, 6), dp(act, 12), dp(act, 6))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(act, 10).toFloat()
-                    setColor(0xFFFFF7ED.toInt())
-                    setStroke(dp(act, 1), 0xFFFFD7B5.toInt())
+                    setColor(0x33FF6A00.toInt())
+                    setStroke(dp(act, 1), 0x66FF6A00.toInt())
                 }
                 isClickable = true
                 setOnClickListener { d.dismiss(); showScanResultPanel(act) }
@@ -150,10 +137,10 @@ object ScanHideHooks {
                         textSize = 12f
                         gravity = Gravity.CENTER
                         setPadding(dp(act, 10), dp(act, 6), dp(act, 10), dp(act, 6))
-                        setTextColor(if (cat == selected) 0xFFFF6A00.toInt() else 0xFF64748B.toInt())
+                        setTextColor(if (cat == selected) 0xFFFF6A00.toInt() else 0xB3FFFFFF.toInt())
                         background = GradientDrawable().apply {
                             cornerRadius = dp(act, 12).toFloat()
-                            setColor(if (cat == selected) 0xFFFFE8D6.toInt() else 0x00FFFFFF)
+                            setColor(if (cat == selected) 0x33FF6A00.toInt() else 0x00FFFFFF)
                         }
                         isClickable = true
                         setOnClickListener { selected = cat; refresh() }
@@ -168,25 +155,19 @@ object ScanHideHooks {
                         setPadding(dp(act, 10), dp(act, 10), dp(act, 10), dp(act, 10))
                         background = GradientDrawable().apply {
                             cornerRadius = dp(act, 14).toFloat()
-                            setColor(Color.WHITE)
-                            setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
+                            setColor(0x22FFFFFF.toInt())
+                            setStroke(dp(act, 1), 0x33FFFFFF.toInt())
                         }
                     }
                     row.addView(TextView(act).apply {
                         text = label
                         textSize = 14f
-                        setTextColor(0xFF334155.toInt())
+                        setTextColor(Color.WHITE)
                     }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                    row.addView(Switch(act).apply {
-                        showText = false
-                        isChecked = hidden.contains(token)
-                        thumbTintList = ColorStateList.valueOf(0xFFFF6A00.toInt())
-                        trackTintList = ColorStateList.valueOf(0xFFE2E8F0.toInt())
-                        setOnCheckedChangeListener { _, checked ->
-                            setHidden(act, token, checked)
-                            apply(act.window?.decorView)
-                            BottomBarAligner.align(act.window?.decorView)
-                        }
+                    row.addView(FrostedKit.iosSwitch(act, hidden.contains(token)) { checked ->
+                        setHidden(act, token, checked)
+                        apply(act.window?.decorView)
+                        BottomBarAligner.align(act.window?.decorView)
                     })
                     list.addView(row)
                     list.addView(View(act).apply { layoutParams = LinearLayout.LayoutParams(1, dp(act, 6)) })
@@ -213,26 +194,12 @@ object ScanHideHooks {
     fun showScanResultPanel(act: Activity) {
         try {
             if (panel?.isShowing == true) return
-            val d = Dialog(act)
-            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-            d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            d.window?.setDimAmount(0.35f)
-            d.window?.setLayout((act.resources.displayMetrics.widthPixels * 0.92f).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
-            d.window?.setGravity(android.view.Gravity.CENTER)
-            val box = LinearLayout(act).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(act, 16), dp(act, 16), dp(act, 16), dp(act, 12))
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(act, 20).toFloat()
-                    setColor(0xFFF8FAFC.toInt())
-                    setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
-                }
-            }
+            val (d, box) = FrostedKit.dialog(act)
             val header = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             header.addView(TextView(act).apply {
                 text = "扫描结果"
                 textSize = 17f
-                setTextColor(0xFF0F172A.toInt())
+                setTextColor(Color.WHITE)
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             val scanBtn = TextView(act).apply {
                 text = "⟳ 重新扫描"
@@ -241,8 +208,8 @@ object ScanHideHooks {
                 setPadding(dp(act, 12), dp(act, 6), dp(act, 12), dp(act, 6))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(act, 10).toFloat()
-                    setColor(0xFFFFF7ED.toInt())
-                    setStroke(dp(act, 1), 0xFFFFD7B5.toInt())
+                    setColor(0x33FF6A00.toInt())
+                    setStroke(dp(act, 1), 0x66FF6A00.toInt())
                 }
                 isClickable = true
             }
@@ -267,10 +234,10 @@ object ScanHideHooks {
                         textSize = 12f
                         gravity = Gravity.CENTER
                         setPadding(dp(act, 10), dp(act, 6), dp(act, 10), dp(act, 6))
-                        setTextColor(if (cat == selected) 0xFFFF6A00.toInt() else 0xFF64748B.toInt())
+                        setTextColor(if (cat == selected) 0xFFFF6A00.toInt() else 0xB3FFFFFF.toInt())
                         background = GradientDrawable().apply {
                             cornerRadius = dp(act, 12).toFloat()
-                            setColor(if (cat == selected) 0xFFFFE8D6.toInt() else 0x00FFFFFF)
+                            setColor(if (cat == selected) 0x33FF6A00.toInt() else 0x00FFFFFF)
                         }
                         isClickable = true
                         setOnClickListener { selected = cat; refresh() }
@@ -282,7 +249,7 @@ object ScanHideHooks {
                     list.addView(TextView(act).apply {
                         text = "没扫到这一类元素"
                         textSize = 12f
-                        setTextColor(0xFF64748B.toInt())
+                        setTextColor(0xB3FFFFFF.toInt())
                         setPadding(0, dp(act, 10), 0, dp(act, 10))
                     })
                 }
@@ -293,26 +260,20 @@ object ScanHideHooks {
                         setPadding(dp(act, 10), dp(act, 10), dp(act, 10), dp(act, 10))
                         background = GradientDrawable().apply {
                             cornerRadius = dp(act, 14).toFloat()
-                            setColor(Color.WHITE)
-                            setStroke(dp(act, 1), 0xFFE2E8F0.toInt())
+                            setColor(0x22FFFFFF.toInt())
+                            setStroke(dp(act, 1), 0x33FFFFFF.toInt())
                         }
                     }
-                    val cb = Switch(act).apply {
-                        showText = false
-                        isChecked = hidden.contains(e.token)
-                        thumbTintList = ColorStateList.valueOf(0xFFFF6A00.toInt())
-                        trackTintList = ColorStateList.valueOf(0xFFE2E8F0.toInt())
+                    val cb = FrostedKit.iosSwitch(act, hidden.contains(e.token)) { checked ->
+                        setHidden(act, e.token, checked)
+                        apply(act.window?.decorView)
+                        BottomBarAligner.align(act.window?.decorView)
                     }
                     val label = TextView(act).apply {
                         text = e.label + "\n" + e.token + " · ${e.w}×${e.h}"
                         textSize = 12f
-                        setTextColor(0xFF334155.toInt())
+                        setTextColor(Color.WHITE)
                         setPadding(dp(act, 6), 0, 0, 0)
-                    }
-                    cb.setOnCheckedChangeListener { _, checked ->
-                        setHidden(act, e.token, checked)
-                        apply(act.window?.decorView)
-                        BottomBarAligner.align(act.window?.decorView)
                     }
                     row.addView(cb)
                     row.addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))

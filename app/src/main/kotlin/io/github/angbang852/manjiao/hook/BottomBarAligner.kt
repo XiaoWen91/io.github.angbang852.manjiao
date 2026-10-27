@@ -27,13 +27,6 @@ object BottomBarAligner {
                 try {
                     val self = chain.thisObject as? View
                     if (self != null) {
-                        self.setOnLongClickListener {
-                            val a = self.context as? Activity
-                            if (a != null) {
-                                MainInjectedPanel.showPanel(a)
-                                true
-                            } else false
-                        }
                         self.post { align(self.rootView) }
                     }
                 } catch (_: Throwable) {}

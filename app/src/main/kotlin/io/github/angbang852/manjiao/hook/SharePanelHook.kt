@@ -159,10 +159,7 @@ object SharePanelHook {
         } catch (_: Throwable) {}
         val open = Runnable {
             try { hostDialog.dismiss() } catch (_: Throwable) {}
-            handler.postDelayed({
-                val act = findActivity(ctx)
-                if (act != null) MainInjectedPanel.showPanel(act) else MainMenuDialog.show(ctx)
-            }, 120)
+            handler.postDelayed({ MainMenuDialog.show(ctx) }, 120)
         }
         anchor.setOnClickListener { open.run() }
         iv?.setOnClickListener { open.run() }
