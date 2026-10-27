@@ -8,8 +8,6 @@ import io.github.libxposed.api.XposedModule
 object StealthVisitorHook {
     fun hook(module: XposedModule, cl: ClassLoader) {
         hookReturnNull(module, cl, "j6l.u7", "b", arrayOf(String::class.java), "kira.stealth.visitor.path")
-        hookReturnTrue(module, cl, "yy8.d", "f", emptyArray(), "kira.stealth.visitor.mode")
-        hookReturnTrue(module, cl, "yy8.d", "g", arrayOf<Class<*>>(Int::class.javaPrimitiveType!!), "kira.stealth.visitor.gate")
         hookReturnTrue(module, cl, "a4l.j0", "lj", emptyArray(), "kira.stealth.visitor.entrance.lj")
         hookReturnTrue(module, cl, "a4l.j0", "nj", emptyArray(), "kira.stealth.visitor.entrance.nj")
         hookReturnTrue(module, cl, "a4l.j0", "oj", emptyArray(), "kira.stealth.visitor.entrance.oj")
