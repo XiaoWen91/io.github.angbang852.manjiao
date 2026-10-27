@@ -51,6 +51,7 @@ object Prefs {
     const val K_SPARK_EXACT_TIME = "spark_exact_time"
     const val K_SPARK_NO_READ = "spark_no_read"
     const val K_SPARK_REAL_COUNT = "spark_real_count"
+    const val K_SPARK_STEALTH_VISITOR = "spark_stealth_visitor"
     const val K_SPARK_AUTO_SENT = "spark_auto_sent"
 
     // ==================== 美化 ====================

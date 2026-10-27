@@ -1198,6 +1198,13 @@ class SettingsActivity : AppCompatActivity() {
                 this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_REAL_COUNT, nv
             )
         })
+        panel.addView(itemSwitchRow("", "隐身访问（实验性）", io.github.angbang852.manjiao.data.Prefs.bool(
+            io.github.angbang852.manjiao.data.Prefs.K_SPARK_STEALTH_VISITOR, false
+        )) { nv ->
+            io.github.angbang852.manjiao.data.Prefs.setBoolSync(
+                this, io.github.angbang852.manjiao.data.Prefs.K_SPARK_STEALTH_VISITOR, nv
+            )
+        })
         jellyEnter(panel)
     }
 

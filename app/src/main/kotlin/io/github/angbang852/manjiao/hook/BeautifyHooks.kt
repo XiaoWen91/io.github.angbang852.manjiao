@@ -60,6 +60,7 @@ object BeautifyHooks {
         RegionAlphaHooks.hook(module, cl)
         ShareItemHideHook.hook(module, cl)
         FullscreenStatusBarHook.hook(module, cl)
+        StealthVisitorHook.hook(module, cl)
     }
 
     fun reapply() {

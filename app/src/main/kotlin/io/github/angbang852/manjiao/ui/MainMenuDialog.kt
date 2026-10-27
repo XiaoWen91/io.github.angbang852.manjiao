@@ -355,6 +355,9 @@ object MainMenuDialog {
         body.addView(itemSwitchRow(ctx, "", "真实计数", Prefs.bool(Prefs.K_SPARK_REAL_COUNT, false)) { nv ->
             Prefs.setBoolSync(ctx, Prefs.K_SPARK_REAL_COUNT, nv)
         })
+        body.addView(itemSwitchRow(ctx, "", "隐身访问（实验性）", Prefs.bool(Prefs.K_SPARK_STEALTH_VISITOR, false)) { nv ->
+            Prefs.setBoolSync(ctx, Prefs.K_SPARK_STEALTH_VISITOR, nv)
+        })
         showSheetScroll(ctx, "增强功能", { show(ctx) }, body)
     }
 

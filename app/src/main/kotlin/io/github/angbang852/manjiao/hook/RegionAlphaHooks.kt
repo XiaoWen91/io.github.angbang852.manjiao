@@ -43,6 +43,8 @@ object RegionAlphaHooks {
                             apply(a.window?.decorView)
                             a.window?.decorView?.postDelayed({ apply(a.window?.decorView) }, 200L)
                             a.window?.decorView?.postDelayed({ apply(a.window?.decorView) }, 800L)
+                            a.window?.decorView?.postDelayed({ apply(a.window?.decorView) }, 1500L)
+                            a.window?.decorView?.postDelayed({ apply(a.window?.decorView) }, 2500L)
                         }
                     } catch (_: Throwable) {}
                     r
@@ -210,9 +212,19 @@ object RegionAlphaHooks {
 
     private fun hasVideoMarker(root: View): Boolean {
         if (findByName(root, "right_action_group") != null) return true
+        if (findByName(root, "group_right_action_bar_root_layout") != null) return true
         if (findByName(root, "bottom_bar_shoot") != null) return true
         if (findByName(root, "caption_container") != null) return true
-        return findByClass(root, "CaptionTextView") != null
+        if (findByName(root, "nasa_player_seekbar") != null) return true
+        if (findByName(root, "photo_detail_placeholder_lottie") != null) return true
+        if (findByName(root, "slide_play_like_image") != null) return true
+        if (findByName(root, "like_button") != null) return true
+        if (findByName(root, "comment_button") != null) return true
+        if (findByName(root, "collect_button") != null) return true
+        if (findByClass(root, "CaptionTextView") != null) return true
+        if (findByClass(root, "UserNameLinearLayout") != null) return true
+        if (findByClass(root, "BottomBarShootView") != null) return true
+        return false
     }
 
     private fun findByClass(v: View, name: String): View? {
@@ -225,7 +237,7 @@ object RegionAlphaHooks {
 
     private fun isCommentOrMessageShown(root: View): Boolean {
         val c = findByName(root, "comment_container") ?: findByName(root, "comment_editor_container")
-        if (c != null && c.isShown) return true
+        if (c != null && c.isShown && c.width > 0 && c.height > 0) return true
         return false
     }
 
@@ -255,10 +267,10 @@ object RegionAlphaHooks {
             }
         }
 
-        applyFirst(listOf("bottom_bar_container", "bottom_bar"), Prefs.K_BEAUTY_ALPHA_BOTTOM)
+        applyFirst(listOf("bottom_bar_container", "bottom_bar", "bottom_bar_shoot"), Prefs.K_BEAUTY_ALPHA_BOTTOM)
         applyFirst(listOf("right_action_group", "group_right_action_bar_root_layout", "right_action_bar"), Prefs.K_BEAUTY_ALPHA_RIGHT)
-        applyFirst(listOf("title_root", "caption_container"), Prefs.K_BEAUTY_ALPHA_TEXT)
-        applyFirst(listOf("top_bar_container", "tab_strip", "tab_layout"), Prefs.K_BEAUTY_ALPHA_TOP)
+        applyFirst(listOf("caption_container"), Prefs.K_BEAUTY_ALPHA_TEXT)
+        applyFirst(listOf("top_bar_container", "alpha_top_bar", "title_root"), Prefs.K_BEAUTY_ALPHA_TOP)
         return appliedNow
     }
 
@@ -273,6 +285,9 @@ object RegionAlphaHooks {
     private fun walk(v: View, playing: Boolean, reset: Boolean, skip: Set<View>) {
         if (skip.contains(v)) return
         if (v.tag == "kira_scan_overlay") return
+        val root = v.rootView
+        if (root != null && root.width > 0 && root.height > 0 &&
+            v.width >= root.width * 0.95f && v.height >= root.height * 0.95f) return
         val key = regionKey(v)
         if (key.isNotEmpty()) {
             val a = if (!playing && reset) 1f else alpha(key)
@@ -294,9 +309,9 @@ object RegionAlphaHooks {
         val id = resName(v)?.lowercase().orEmpty()
         if (id.contains("comment") || id.contains("message") || cls.contains("comment") || cls.contains("message")) return ""
         if (cls.contains("captiontextview") || cls.contains("usernamelinearlayout") || id.contains("caption") || id.contains("username")) return Prefs.K_BEAUTY_ALPHA_TEXT
-        if (id == "bottom_bar_container" || id == "bottom_bar" || id == "main_tab_container" || id == "bottom_bar_shoot") return Prefs.K_BEAUTY_ALPHA_BOTTOM
+        if (id == "bottom_bar_container" || id == "bottom_bar" || id == "bottom_bar_shoot") return Prefs.K_BEAUTY_ALPHA_BOTTOM
         if (id == "right_action_group" || id == "group_right_action_bar_root_layout" || id == "right_action_bar") return Prefs.K_BEAUTY_ALPHA_RIGHT
-        if (id == "top_bar_container" || id == "tab_strip" || id == "tab_layout" || id == "alpha_top_bar") return Prefs.K_BEAUTY_ALPHA_TOP
+        if (id == "top_bar_container" || id == "alpha_top_bar" || id == "title_root") return Prefs.K_BEAUTY_ALPHA_TOP
         return ""
     }
 
