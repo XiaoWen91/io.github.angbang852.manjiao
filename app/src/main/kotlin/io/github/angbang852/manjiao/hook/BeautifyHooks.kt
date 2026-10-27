@@ -41,9 +41,6 @@ object BeautifyHooks {
     fun hook(module: XposedModule, cl: ClassLoader) {
         loader = cl
         hookDpi(module)
-        hookBottomBar(module, cl)
-        hookBottomReorder(module, cl)
-        hookBottomShoot(module, cl)
         hookRightActionBar(module, cl)
         hookPendant(module, cl)
         hookFullscreen(module, cl)
@@ -53,8 +50,12 @@ object BeautifyHooks {
         hookOfficialDate(module, cl)
         hookCaptionTextView(module, cl)
         hookUserNameFallback(module, cl)
-        hookPlaybackAlpha(module, cl)
         hookPlayerState(module, cl)
+        ScanHideHooks.hook(module, cl)
+        BottomBarAligner.hook(module, cl)
+        RegionAlphaHooks.hook(module, cl)
+        ShareItemHideHook.hook(module, cl)
+        FullscreenStatusBarHook.hook(module, cl)
     }
 
     fun reapply() {
@@ -64,7 +65,6 @@ object BeautifyHooks {
             bottomRegions.keys.toList().forEach { applyBottomContainer(it) }
             rightContainers.keys.toList().forEach { applyRightContainer(it) }
             pendantRoots.keys.toList().forEach { applyPendant(it) }
-            applyPlayAlpha(null)
         } catch (t: Throwable) {
             Logger.d("beauty reapply miss: ${t.message}")
         }
@@ -770,7 +770,8 @@ object BeautifyHooks {
                         lastCaptionSeen = System.currentTimeMillis()
                         lastCaptionView = java.lang.ref.WeakReference(tv)
                         uiRoots[tv] = "caption"
-                        applyPlayAlpha(null)
+                        RegionAlphaHooks.apply(tv.rootView)
+                        ScanHideHooks.apply(tv.rootView)
                         reapplyRight()
                         applyOfficialDate(tv.rootView)
                         tv.postDelayed({ applyOfficialDate(tv.rootView) }, 300L)
@@ -812,8 +813,7 @@ object BeautifyHooks {
         try {
             val id = root.context.resources.getIdentifier("create_date_tv", "id", "com.smile.gifmaker")
             if (id == 0) return
-            val v = findViewId(root, id) ?: return
-            val tv = v as? TextView ?: return
+            val tv = findOfficialDateView(root, id) ?: return
             val photo = CurrentPhotoHook.currentPhotoPublic() ?: lastPhoto?.takeIf {
                 System.currentTimeMillis() - lastPhotoAt <= 5000L
             }
@@ -822,6 +822,28 @@ object BeautifyHooks {
             tv.visibility = View.VISIBLE
         } catch (_: Throwable) {
         }
+    }
+
+    private fun findOfficialDateView(v: View, id: Int): TextView? {
+        if (v.id == id && v is TextView && !isInUserName(v)) return v
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) {
+                findOfficialDateView(v.getChildAt(i), id)?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun isInUserName(v: View): Boolean {
+        var p: View? = v
+        var d = 0
+        while (p != null && d < 8) {
+            val n = p.javaClass.name.lowercase()
+            if (n.contains("username") || n.contains("user_name")) return true
+            p = p.parent as? View
+            d++
+        }
+        return false
     }
 
     private fun findViewId(v: View, id: Int): View? {
@@ -866,7 +888,8 @@ object BeautifyHooks {
                         } catch (_: Throwable) {
                         }
                     }
-                    applyPlayAlpha(null)
+                    RegionAlphaHooks.apply((self as? View)?.rootView)
+                    ScanHideHooks.apply((self as? View)?.rootView)
                     reapplyRight()
                     if (lastPhoto != null && lastCaptionView?.get()?.isAttachedToWindow != true &&
                         System.currentTimeMillis() - lastCaptionSeen > 800 &&

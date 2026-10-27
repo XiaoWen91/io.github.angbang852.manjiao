@@ -34,6 +34,8 @@ object BeautifyUi {
         "音乐" to "music"
     )
 
+    private val SHARE_ITEMS = listOf("保存到相册", "下载", "分享到微信", "朋友圈", "QQ", "微博", "复制链接", "举报", "不感兴趣")
+
     fun build(ctx: Context): LinearLayout {
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -44,13 +46,15 @@ object BeautifyUi {
         root.addView(row(ctx, "全局 DPI", value(ctx, Prefs.K_BEAUTY_DPI, "默认")) { dpiDialog(ctx) })
 
         root.addView(section(ctx, "底栏"))
-        root.addView(row(ctx, "隐藏组件", value(ctx, Prefs.K_BEAUTY_BOTTOM_HIDE, "未设置")) {
-            checklist(ctx, "底栏隐藏组件", Prefs.K_BEAUTY_BOTTOM_HIDE, BOTTOM_ITEMS)
+        root.addView(row(ctx, "隐藏 Tab / 视频控件", "点击打开") {
+            try {
+                val i = android.content.Intent(io.github.angbang852.manjiao.hook.ActivityBridge.ACTION_SHOW_SCAN)
+                i.setPackage("com.smile.gifmaker")
+                ctx.sendBroadcast(i)
+            } catch (_: Throwable) {
+            }
         })
-        root.addView(row(ctx, "替换文字", value(ctx, Prefs.K_BEAUTY_BOTTOM_TEXT, "未设置")) {
-            replaceDialog(ctx, "底栏替换文字", Prefs.K_BEAUTY_BOTTOM_TEXT, BOTTOM_ITEMS)
-        })
-        root.addView(toggleRow(ctx, "底栏美化（加号放右，其他放左）", Prefs.K_BEAUTY_BOTTOM_STYLE, false))
+        root.addView(toggleRow(ctx, "底栏自适应（隐藏后加号居中）", Prefs.K_BEAUTY_BOTTOM_AUTO, true))
         root.addView(toggleRow(ctx, "底栏透明", Prefs.K_BEAUTY_BOTTOM_TRANSPARENT, false))
 
         root.addView(section(ctx, "视频页右侧"))
@@ -68,9 +72,16 @@ object BeautifyUi {
         root.addView(toggleRow(ctx, "关注前确认", Prefs.K_CONFIRM_FOLLOW, false))
 
         root.addView(section(ctx, "播放 UI"))
-        root.addView(row(ctx, "播放/暂停 UI 透明度", alphaSummary(ctx)) { alphaDialog(ctx) })
+        root.addView(row(ctx, "区域透明度", "4 区域") { regionAlphaDialog(ctx) })
+        root.addView(toggleRow(ctx, "暂停时恢复默认透明度", Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false))
+        root.addView(toggleRow(ctx, "全屏隐藏状态栏", Prefs.K_BEAUTY_HIDE_STATUS_BAR, false))
         root.addView(toggleRow(ctx, "去除全屏观看按钮", Prefs.K_BEAUTY_NO_FULLSCREEN, false))
         root.addView(toggleRow(ctx, "去除金币/红包按钮", Prefs.K_BEAUTY_NO_COIN, false))
+
+        root.addView(section(ctx, "分享面板"))
+        root.addView(row(ctx, "隐藏项", value(ctx, Prefs.K_BEAUTY_SHARE_HIDE, "未设置")) {
+            checklist(ctx, "分享面板隐藏项", Prefs.K_BEAUTY_SHARE_HIDE, SHARE_ITEMS)
+        })
 
         return root
     }
@@ -297,6 +308,64 @@ object BeautifyUi {
         row.addView(label)
         row.addView(bar)
         return row to bar
+    }
+
+    private fun regionAlphaDialog(ctx: Context) {
+        val d = Dialog(ctx)
+        val box = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(ctx, 18), dp(ctx, 18), dp(ctx, 18), dp(ctx, 18))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(ctx, 18).toFloat()
+                setColor(0xF21E1E22.toInt())
+            }
+        }
+        box.addView(TextView(ctx).apply {
+            text = "区域透明度"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, 0, dp(ctx, 10))
+        })
+        val specs = listOf(
+            "顶栏" to Prefs.K_BEAUTY_ALPHA_TOP,
+            "右侧信息" to Prefs.K_BEAUTY_ALPHA_RIGHT,
+            "左下角信息" to Prefs.K_BEAUTY_ALPHA_TEXT,
+            "底栏" to Prefs.K_BEAUTY_ALPHA_BOTTOM
+        )
+        for ((title, key) in specs) {
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(ctx, 6), 0, dp(ctx, 6))
+            }
+            row.addView(TextView(ctx).apply {
+                text = title
+                textSize = 13f
+                setTextColor(0xE6FFFFFF.toInt())
+            })
+            val sb = SeekBar(ctx).apply {
+                max = 100
+                progress = ((Prefs.str(key, "1.00").toFloatOrNull() ?: 1f) * 100).toInt().coerceIn(0, 100)
+            }
+            sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                    Prefs.setStr(key, String.format(java.util.Locale.US, "%.2f", p / 100f))
+                }
+                override fun onStartTrackingTouch(s: SeekBar?) {}
+                override fun onStopTrackingTouch(s: SeekBar?) {}
+            })
+            row.addView(sb)
+            box.addView(row)
+        }
+        box.addView(TextView(ctx).apply {
+            text = "关闭"
+            textSize = 14f
+            setTextColor(0xFFFF6A00.toInt())
+            gravity = Gravity.CENTER
+            setPadding(0, dp(ctx, 12), 0, 0)
+            setOnClickListener { d.dismiss() }
+        })
+        d.setContentView(box)
+        d.show()
     }
 
     private fun alphaSummary(ctx: Context): String {
