@@ -276,6 +276,7 @@ object BeautifyHooks {
 
     private fun updateBottomShoot(v: View?) {
         if (v == null) return
+        if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_AUTO, true)) return
         try {
             if (v.javaClass.name.contains("BottomBarShootView") && Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false)) {
                 val p = v.parent as? ViewGroup

@@ -11,6 +11,8 @@ import java.lang.ref.WeakReference
 object ActivityBridge {
     const val ACTION_SHOW_SCAN = "com.KiraTools.Wen.action.SHOW_SCAN"
     const val ACTION_SHOW_MAIN = "com.KiraTools.Wen.action.SHOW_MAIN"
+    const val ACTION_APPLY_ALPHA = "com.KiraTools.Wen.action.APPLY_ALPHA"
+    const val ACTION_APPLY_HIDE = "com.KiraTools.Wen.action.APPLY_HIDE"
 
     private var current: WeakReference<Activity>? = null
     private var registered = false
@@ -21,6 +23,8 @@ object ActivityBridge {
             when (intent?.action) {
                 ACTION_SHOW_SCAN -> act.runOnUiThread { ScanHideHooks.showPanel(act) }
                 ACTION_SHOW_MAIN -> act.runOnUiThread { io.github.angbang852.manjiao.ui.MainMenuDialog.show(act) }
+                ACTION_APPLY_ALPHA -> act.runOnUiThread { RegionAlphaHooks.apply(act.window?.decorView) }
+                ACTION_APPLY_HIDE -> act.runOnUiThread { ScanHideHooks.apply(act.window?.decorView); BottomBarAligner.align(act.window?.decorView) }
             }
         }
     }
@@ -32,6 +36,8 @@ object ActivityBridge {
             val filter = IntentFilter().apply {
                 addAction(ACTION_SHOW_SCAN)
                 addAction(ACTION_SHOW_MAIN)
+                addAction(ACTION_APPLY_ALPHA)
+                addAction(ACTION_APPLY_HIDE)
             }
             if (Build.VERSION.SDK_INT >= 33) {
                 act.applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)

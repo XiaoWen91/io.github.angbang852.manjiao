@@ -12,6 +12,7 @@ import kotlin.math.abs
 
 object BottomBarAligner {
     private var aligning = false
+    private var lastSig = ""
     private val originalLp = java.util.WeakHashMap<View, ViewGroup.LayoutParams>()
 
     fun hook(module: XposedModule, cl: ClassLoader) {
@@ -102,6 +103,7 @@ object BottomBarAligner {
                 }
                 shoot?.translationX = 0f
                 indicator.requestLayout()
+                lastSig = ""
             }
             return
         }
@@ -113,25 +115,33 @@ object BottomBarAligner {
         if (barWidth <= 0 || n <= 0) return
         val cell = barWidth / n
         val shootIndex = n / 2
+        val sig = "$hidden/$n/$barWidth"
+        val same = sig == lastSig
+        if (!same) lastSig = sig
 
-        for ((idx, v) in visible.withIndex()) {
-            val lp = v.layoutParams ?: continue
-            if (!originalLp.containsKey(v)) originalLp[v] = lp
-            if (lp.width != cell) {
-                lp.width = cell
-                v.layoutParams = lp
-            }
-            val mlp = lp as? ViewGroup.MarginLayoutParams
-            if (mlp != null) {
-                val left = if (shootVisible && idx >= shootIndex) cell else 0
-                if (mlp.leftMargin != left || mlp.rightMargin != 0) {
-                    mlp.leftMargin = left
-                    mlp.rightMargin = 0
-                    v.layoutParams = mlp
+        if (!same) {
+            var layoutChanged = false
+            for ((idx, v) in visible.withIndex()) {
+                val lp = v.layoutParams ?: continue
+                if (!originalLp.containsKey(v)) originalLp[v] = lp
+                if (lp.width != cell) {
+                    lp.width = cell
+                    v.layoutParams = lp
+                    layoutChanged = true
+                }
+                val mlp = lp as? ViewGroup.MarginLayoutParams
+                if (mlp != null) {
+                    val left = if (shootVisible && idx >= shootIndex) cell else 0
+                    if (mlp.leftMargin != left || mlp.rightMargin != 0) {
+                        mlp.leftMargin = left
+                        mlp.rightMargin = 0
+                        v.layoutParams = mlp
+                        layoutChanged = true
+                    }
                 }
             }
+            if (layoutChanged) indicator.requestLayout()
         }
-        indicator.requestLayout()
 
         if (shootVisible && shoot != null) {
             shoot.post {

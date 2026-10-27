@@ -60,10 +60,13 @@ object RegionAlphaHooks {
         try {
             if (panel?.isShowing == true) return
             val (d, box) = FrostedKit.dialog(act)
-            box.minimumHeight = dp(act, 520)
+            d.window?.setLayout(
+                (act.resources.displayMetrics.widthPixels * 0.92f).toInt(),
+                (act.resources.displayMetrics.heightPixels * 0.75f).toInt()
+            )
             box.layoutParams = android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(act, 520)
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
             )
             box.addView(TextView(act).apply {
                 text = "区域透明度"
@@ -97,6 +100,12 @@ object RegionAlphaHooks {
                         val v = p / 100f
                         Prefs.setStrSync(act, key, String.format(java.util.Locale.US, "%.2f", v))
                         previewAlpha(key, v, act.window?.decorView)
+                        try {
+                            val i = android.content.Intent(ActivityBridge.ACTION_APPLY_ALPHA)
+                            i.setPackage("com.smile.gifmaker")
+                            act.sendBroadcast(i)
+                        } catch (_: Throwable) {
+                        }
                     }
                 }
                 box.addView(label)
@@ -149,10 +158,39 @@ object RegionAlphaHooks {
     fun apply(root: View?) {
         if (root == null) return
         try {
+            applyKnown(root)
             walk(root, PlaybackState.isPlaying(), Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false))
         } catch (t: Throwable) {
             Logger.d("kira region alpha apply miss: ${t.message}")
         }
+    }
+
+    private fun applyKnown(root: View) {
+        val playing = PlaybackState.isPlaying()
+        val reset = Prefs.bool(Prefs.K_BEAUTY_ALPHA_PAUSE_RESET, false)
+        fun apply(name: String, key: String) {
+            findByName(root, name)?.let { v ->
+                val a = if (!playing && reset) 1f else alpha(key)
+                if (a < 0.999f) {
+                    applied[v] = a
+                    v.alpha = a
+                } else if (applied.remove(v) != null) {
+                    v.alpha = 1f
+                }
+            }
+        }
+        apply("bottom_bar_container", Prefs.K_BEAUTY_ALPHA_BOTTOM)
+        apply("right_action_group", Prefs.K_BEAUTY_ALPHA_RIGHT)
+        apply("title_root", Prefs.K_BEAUTY_ALPHA_TEXT)
+        apply("top_bar_container", Prefs.K_BEAUTY_ALPHA_TOP)
+    }
+
+    private fun findByName(v: View, name: String): View? {
+        if (resName(v) == name) return v
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) findByName(v.getChildAt(i), name)?.let { return it }
+        }
+        return null
     }
 
     private fun walk(v: View, playing: Boolean, reset: Boolean) {

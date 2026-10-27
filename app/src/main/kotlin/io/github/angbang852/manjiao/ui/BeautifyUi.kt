@@ -79,6 +79,17 @@ object BeautifyUi {
             } catch (_: Throwable) {
             }
         })
+        root.addView(row(ctx, "恢复全部隐藏", "清除") {
+            try {
+                Prefs.setStrSync(ctx, Prefs.K_BEAUTY_HIDDEN_ELEMS, "")
+                Prefs.setStrSync(ctx, Prefs.K_BEAUTY_BOTTOM_HIDE, "")
+                val i = android.content.Intent(io.github.angbang852.manjiao.hook.ActivityBridge.ACTION_APPLY_HIDE)
+                i.setPackage("com.smile.gifmaker")
+                ctx.sendBroadcast(i)
+                BeautifyHooks.reapply()
+            } catch (_: Throwable) {
+            }
+        })
         return root
     }
 
@@ -353,66 +364,10 @@ object BeautifyUi {
     }
 
     private fun regionAlphaDialog(ctx: Context) {
-        val d = Dialog(ctx)
-        d.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        d.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        d.window?.setDimAmount(0.35f)
-        d.window?.setLayout((ctx.resources.displayMetrics.widthPixels * 0.92f).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        d.window?.setGravity(Gravity.CENTER)
-        val box = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(ctx, 18), dp(ctx, 18), dp(ctx, 18), dp(ctx, 18))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(ctx, 18).toFloat()
-                setColor(0xF21E1E22.toInt())
-            }
-        }
-        box.addView(TextView(ctx).apply {
-            text = "区域透明度"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setPadding(0, 0, 0, dp(ctx, 10))
-        })
-        val specs = listOf(
-            "顶栏" to Prefs.K_BEAUTY_ALPHA_TOP,
-            "右侧信息" to Prefs.K_BEAUTY_ALPHA_RIGHT,
-            "左下角信息" to Prefs.K_BEAUTY_ALPHA_TEXT,
-            "底栏" to Prefs.K_BEAUTY_ALPHA_BOTTOM
-        )
-        for ((title, key) in specs) {
-            val row = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, dp(ctx, 6), 0, dp(ctx, 6))
-            }
-            row.addView(TextView(ctx).apply {
-                text = title
-                textSize = 13f
-                setTextColor(0xE6FFFFFF.toInt())
-            })
-            val sb = SeekBar(ctx).apply {
-                max = 100
-                progress = ((Prefs.str(key, "1.00").toFloatOrNull() ?: 1f) * 100).toInt().coerceIn(0, 100)
-            }
-            sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
-                    Prefs.setStr(key, String.format(java.util.Locale.US, "%.2f", p / 100f))
-                }
-                override fun onStartTrackingTouch(s: SeekBar?) {}
-                override fun onStopTrackingTouch(s: SeekBar?) {}
-            })
-            row.addView(sb)
-            box.addView(row)
-        }
-        box.addView(TextView(ctx).apply {
-            text = "关闭"
-            textSize = 14f
-            setTextColor(0xFFFF6A00.toInt())
-            gravity = Gravity.CENTER
-            setPadding(0, dp(ctx, 12), 0, 0)
-            setOnClickListener { d.dismiss() }
-        })
-        d.setContentView(box)
-        d.show()
+        val act = ctx as? android.app.Activity
+            ?: (ctx as? android.content.ContextWrapper)?.baseContext as? android.app.Activity
+            ?: return
+        io.github.angbang852.manjiao.hook.RegionAlphaHooks.showPanel(act)
     }
 
     private fun alphaSummary(ctx: Context): String {

@@ -56,9 +56,7 @@ object ScanHideHooks {
     }
 
     private fun isHiddenToken(v: View, token: String, hidden: Set<String>): Boolean {
-        if (hidden.contains(token)) return true
-        val label = labelFor(v)
-        return label.isNotEmpty() && hidden.contains("text:$label")
+        return hidden.contains(token)
     }
 
     fun apply(root: View?) {
@@ -119,6 +117,21 @@ object ScanHideHooks {
                 setOnClickListener { d.dismiss(); showScanResultPanel(act) }
             }
             header.addView(scanBtn)
+            val clearBtn = TextView(act).apply {
+                text = "恢复全部"
+                textSize = 12f
+                setTextColor(0xFF0A84FF.toInt())
+                setPadding(dp(act, 8), dp(act, 6), dp(act, 4), dp(act, 6))
+                isClickable = true
+                setOnClickListener {
+                    Prefs.setStrSync(act, Prefs.K_BEAUTY_HIDDEN_ELEMS, "")
+                    Prefs.setStrSync(act, Prefs.K_BEAUTY_BOTTOM_HIDE, "")
+                    apply(act.window?.decorView)
+                    BottomBarAligner.align(act.window?.decorView)
+                    d.dismiss()
+                }
+            }
+            header.addView(clearBtn)
             box.addView(header)
             val tabs = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(act, 8), 0, dp(act, 6)) }
             box.addView(tabs)
