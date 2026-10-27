@@ -65,12 +65,11 @@ object MainInjectedPanel {
             box.addView(TextView(act).apply {
                 text = "关闭"
                 textSize = 14f
-                setTextColor(0xFFFF6A00.toInt())
+                setTextColor(0xFF0A84FF.toInt())
                 gravity = Gravity.CENTER
                 setPadding(0, dp(act, 12), 0, 0)
                 setOnClickListener { d.dismiss() }
             })
-            d.setContentView(box)
             d.setOnDismissListener { panel = null }
             panel = d
             d.show()
@@ -111,12 +110,11 @@ object MainInjectedPanel {
             box.addView(TextView(act).apply {
                 text = "关闭"
                 textSize = 14f
-                setTextColor(0xFFFF6A00.toInt())
+                setTextColor(0xFF0A84FF.toInt())
                 gravity = Gravity.CENTER
                 setPadding(0, dp(act, 12), 0, 0)
                 setOnClickListener { d.dismiss() }
             })
-            d.setContentView(box)
             d.show()
         } catch (t: Throwable) {
             Logger.d("kira share hide panel miss: ${t.message}")

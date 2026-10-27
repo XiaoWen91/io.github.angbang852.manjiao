@@ -174,12 +174,11 @@ object BeautifyHooks {
                 val r = chain.proceed()
                 try {
                     val self = chain.thisObject as? View
-                    if (self != null) {
+                    if (self != null && !Prefs.bool(Prefs.K_BEAUTY_BOTTOM_AUTO, true)) {
                         if (Prefs.bool(Prefs.K_BEAUTY_BOTTOM_STYLE, false)) {
                             val p = self.parent as? ViewGroup
                             if (p != null && p.width > 0 && self.width > 0) {
-                                val dx = 0f
-                                try { self.translationX = dx } catch (_: Throwable) {}
+                                try { self.translationX = 0f } catch (_: Throwable) {}
                             }
                         } else {
                             try { self.translationX = 0f } catch (_: Throwable) {}

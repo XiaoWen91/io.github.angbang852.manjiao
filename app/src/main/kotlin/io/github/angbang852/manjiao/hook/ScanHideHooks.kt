@@ -108,12 +108,12 @@ object ScanHideHooks {
             val scanBtn = TextView(act).apply {
                 text = "⟳ 扫描"
                 textSize = 13f
-                setTextColor(0xFFFF6A00.toInt())
+                setTextColor(0xFF0A84FF.toInt())
                 setPadding(dp(act, 12), dp(act, 6), dp(act, 12), dp(act, 6))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(act, 10).toFloat()
-                    setColor(0x33FF6A00.toInt())
-                    setStroke(dp(act, 1), 0x66FF6A00.toInt())
+                    setColor(0x330A84FF.toInt())
+                    setStroke(dp(act, 1), 0x660A84FF.toInt())
                 }
                 isClickable = true
                 setOnClickListener { d.dismiss(); showScanResultPanel(act) }
@@ -137,10 +137,10 @@ object ScanHideHooks {
                         textSize = 12f
                         gravity = Gravity.CENTER
                         setPadding(dp(act, 10), dp(act, 6), dp(act, 10), dp(act, 6))
-                        setTextColor(if (cat == selected) 0xFFFF6A00.toInt() else 0xB3FFFFFF.toInt())
+                        setTextColor(if (cat == selected) 0xFF0A84FF.toInt() else 0xB3FFFFFF.toInt())
                         background = GradientDrawable().apply {
                             cornerRadius = dp(act, 12).toFloat()
-                            setColor(if (cat == selected) 0x33FF6A00.toInt() else 0x00FFFFFF)
+                            setColor(if (cat == selected) 0x330A84FF.toInt() else 0x00FFFFFF)
                         }
                         isClickable = true
                         setOnClickListener { selected = cat; refresh() }
@@ -177,12 +177,11 @@ object ScanHideHooks {
             box.addView(TextView(act).apply {
                 text = "关闭"
                 textSize = 14f
-                setTextColor(0xFFFF6A00.toInt())
+                setTextColor(0xFF0A84FF.toInt())
                 gravity = Gravity.CENTER
                 setPadding(0, dp(act, 12), 0, 0)
                 setOnClickListener { d.dismiss() }
             })
-            d.setContentView(box)
             d.setOnDismissListener { panel = null }
             panel = d
             d.show()
@@ -204,12 +203,12 @@ object ScanHideHooks {
             val scanBtn = TextView(act).apply {
                 text = "⟳ 重新扫描"
                 textSize = 13f
-                setTextColor(0xFFFF6A00.toInt())
+                setTextColor(0xFF0A84FF.toInt())
                 setPadding(dp(act, 12), dp(act, 6), dp(act, 12), dp(act, 6))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(act, 10).toFloat()
-                    setColor(0x33FF6A00.toInt())
-                    setStroke(dp(act, 1), 0x66FF6A00.toInt())
+                    setColor(0x330A84FF.toInt())
+                    setStroke(dp(act, 1), 0x660A84FF.toInt())
                 }
                 isClickable = true
             }
@@ -234,10 +233,10 @@ object ScanHideHooks {
                         textSize = 12f
                         gravity = Gravity.CENTER
                         setPadding(dp(act, 10), dp(act, 6), dp(act, 10), dp(act, 6))
-                        setTextColor(if (cat == selected) 0xFFFF6A00.toInt() else 0xB3FFFFFF.toInt())
+                        setTextColor(if (cat == selected) 0xFF0A84FF.toInt() else 0xB3FFFFFF.toInt())
                         background = GradientDrawable().apply {
                             cornerRadius = dp(act, 12).toFloat()
-                            setColor(if (cat == selected) 0x33FF6A00.toInt() else 0x00FFFFFF)
+                            setColor(if (cat == selected) 0x330A84FF.toInt() else 0x00FFFFFF)
                         }
                         isClickable = true
                         setOnClickListener { selected = cat; refresh() }
@@ -286,12 +285,11 @@ object ScanHideHooks {
             box.addView(TextView(act).apply {
                 text = "关闭"
                 textSize = 14f
-                setTextColor(0xFFFF6A00.toInt())
+                setTextColor(0xFF0A84FF.toInt())
                 gravity = Gravity.CENTER
                 setPadding(0, dp(act, 12), 0, 0)
                 setOnClickListener { d.dismiss() }
             })
-            d.setContentView(box)
             d.setOnDismissListener { panel = null }
             panel = d
             d.show()

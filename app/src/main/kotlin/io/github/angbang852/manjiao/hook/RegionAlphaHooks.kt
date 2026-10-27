@@ -16,6 +16,7 @@ import android.widget.TextView
 import io.github.angbang852.manjiao.adapt.PlaybackState
 import io.github.angbang852.manjiao.data.Prefs
 import io.github.angbang852.manjiao.ui.FrostedKit
+import io.github.angbang852.manjiao.ui.KiraSlider
 import io.github.angbang852.manjiao.util.Logger
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -59,6 +60,7 @@ object RegionAlphaHooks {
         try {
             if (panel?.isShowing == true) return
             val (d, box) = FrostedKit.dialog(act)
+            box.minimumHeight = dp(act, 420)
             box.addView(TextView(act).apply {
                 text = "区域透明度"
                 textSize = 17f
@@ -80,20 +82,14 @@ object RegionAlphaHooks {
                 fun syncLabel(p: Int) { label.text = "$title  ${p}%" }
                 val cur = ((Prefs.str(key, "1.00").toFloatOrNull() ?: 1f) * 100).toInt().coerceIn(0, 100)
                 syncLabel(cur)
-                val sb = SeekBar(act).apply {
-                    max = 100
-                    progress = cur
-                }
-                styleSeekBar(act, sb)
-                sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                    override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                val sb = KiraSlider(act).apply {
+                    value = cur
+                    onChanged = { p ->
                         syncLabel(p)
                         Prefs.setStr(key, String.format(java.util.Locale.US, "%.2f", p / 100f))
                         apply(act.window?.decorView)
                     }
-                    override fun onStartTrackingTouch(s: SeekBar?) {}
-                    override fun onStopTrackingTouch(s: SeekBar?) {}
-                })
+                }
                 box.addView(label)
                 box.addView(sb)
             }
@@ -115,12 +111,11 @@ object RegionAlphaHooks {
             box.addView(TextView(act).apply {
                 text = "关闭"
                 textSize = 14f
-                setTextColor(0xFFFF6A00.toInt())
+                setTextColor(0xFF0A84FF.toInt())
                 gravity = Gravity.CENTER
                 setPadding(0, dp(act, 12), 0, 0)
                 setOnClickListener { d.dismiss() }
             })
-            d.setContentView(box)
             d.setOnDismissListener { panel = null }
             panel = d
             d.show()
@@ -149,6 +144,7 @@ object RegionAlphaHooks {
             } else if (applied.remove(v) != null) {
                 v.alpha = 1f
             }
+            return
         }
         if (v is ViewGroup) {
             for (i in 0 until v.childCount) walk(v.getChildAt(i), playing, reset)
@@ -158,10 +154,10 @@ object RegionAlphaHooks {
     private fun regionKey(v: View): String {
         val cls = v.javaClass.name.lowercase()
         val id = resName(v)?.lowercase().orEmpty()
-        if (cls.contains("caption") || cls.contains("username") || id.contains("caption")) return Prefs.K_BEAUTY_ALPHA_TEXT
-        if (cls.contains("bottom") || id.contains("bottom")) return Prefs.K_BEAUTY_ALPHA_BOTTOM
-        if (cls.contains("right") || cls.contains("actionbar") || id.contains("right")) return Prefs.K_BEAUTY_ALPHA_RIGHT
-        if (cls.contains("top") || cls.contains("tabstrip") || id.contains("top")) return Prefs.K_BEAUTY_ALPHA_TOP
+        if (cls.contains("caption") || cls.contains("username") || id.contains("caption") || id.contains("title") || id.contains("username")) return Prefs.K_BEAUTY_ALPHA_TEXT
+        if (cls.contains("bottom") || id.contains("bottom") || id.contains("tab")) return Prefs.K_BEAUTY_ALPHA_BOTTOM
+        if (cls.contains("right") || cls.contains("action") || id.contains("right") || id.contains("action")) return Prefs.K_BEAUTY_ALPHA_RIGHT
+        if (cls.contains("top") || cls.contains("tabstrip") || id.contains("top") || id.contains("status")) return Prefs.K_BEAUTY_ALPHA_TOP
         return ""
     }
 
@@ -176,7 +172,7 @@ object RegionAlphaHooks {
             }
             val progress = GradientDrawable().apply {
                 cornerRadius = dp(ctx, 4).toFloat()
-                setColor(0xFFFF6A00.toInt())
+                setColor(0xFF0A84FF.toInt())
             }
             val clip = ClipDrawable(progress, Gravity.LEFT, ClipDrawable.HORIZONTAL)
             val layer = LayerDrawable(arrayOf(track, clip))
@@ -186,7 +182,7 @@ object RegionAlphaHooks {
             sb.thumb = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.WHITE)
-                setStroke(dp(ctx, 2), 0xFFFF6A00.toInt())
+                setStroke(dp(ctx, 2), 0xFF0A84FF.toInt())
             }
             sb.thumbOffset = dp(ctx, 8)
             sb.setSplitTrack(false)
