@@ -56,7 +56,7 @@ object ConfirmDialog {
                     setPadding(0, dp(activity, 18), 0, 0)
                 }
                 row.addView(btn(activity, "取消", 0x22FFFFFF, 0xE6FFFFFF.toInt()) { dialog.dismiss() })
-                row.addView(btn(activity, confirmText, 0xFFFF6A00.toInt(), Color.WHITE) {
+                row.addView(btn(activity, confirmText, 0xFF0A84FF.toInt(), Color.WHITE) {
                     dialog.dismiss()
                     try { onConfirm() } catch (_: Throwable) {}
                 })

@@ -95,12 +95,14 @@ object BottomBarAligner {
 
         val shoot = findShoot(container)
         if (hidden == 0) {
-            for (i in 0 until indicator.childCount) {
-                val ch = indicator.getChildAt(i)
-                originalLp.remove(ch)?.let { ch.layoutParams = it }
+            if (Prefs.str(Prefs.K_BEAUTY_HIDDEN_ELEMS, "").isBlank()) {
+                for (i in 0 until indicator.childCount) {
+                    val ch = indicator.getChildAt(i)
+                    originalLp.remove(ch)?.let { ch.layoutParams = it }
+                }
+                shoot?.translationX = 0f
+                indicator.requestLayout()
             }
-            shoot?.translationX = 0f
-            indicator.requestLayout()
             return
         }
         if (visible.isEmpty()) return

@@ -60,7 +60,11 @@ object RegionAlphaHooks {
         try {
             if (panel?.isShowing == true) return
             val (d, box) = FrostedKit.dialog(act)
-            box.minimumHeight = dp(act, 420)
+            box.minimumHeight = dp(act, 520)
+            box.layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(act, 520)
+            )
             box.addView(TextView(act).apply {
                 text = "区域透明度"
                 textSize = 17f
@@ -84,10 +88,15 @@ object RegionAlphaHooks {
                 syncLabel(cur)
                 val sb = KiraSlider(act).apply {
                     value = cur
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(act, 44)
+                    )
                     onChanged = { p ->
                         syncLabel(p)
-                        Prefs.setStr(key, String.format(java.util.Locale.US, "%.2f", p / 100f))
-                        apply(act.window?.decorView)
+                        val v = p / 100f
+                        Prefs.setStrSync(act, key, String.format(java.util.Locale.US, "%.2f", v))
+                        previewAlpha(key, v, act.window?.decorView)
                     }
                 }
                 box.addView(label)
@@ -121,6 +130,19 @@ object RegionAlphaHooks {
             d.show()
         } catch (t: Throwable) {
             Logger.d("kira region alpha panel miss: ${t.message}")
+        }
+    }
+
+    @Volatile private var liveKey: String? = null
+    @Volatile private var liveValue: Float = 1f
+
+    private fun previewAlpha(key: String, v: Float, root: View?) {
+        liveKey = key
+        liveValue = v
+        try {
+            apply(root)
+        } finally {
+            liveKey = null
         }
     }
 
@@ -161,8 +183,10 @@ object RegionAlphaHooks {
         return ""
     }
 
-    private fun alpha(key: String): Float =
-        Prefs.str(key, "1.00").toFloatOrNull()?.coerceIn(0f, 1f) ?: 1f
+    private fun alpha(key: String): Float {
+        if (key == liveKey) return liveValue
+        return Prefs.str(key, "1.00").toFloatOrNull()?.coerceIn(0f, 1f) ?: 1f
+    }
 
     private fun styleSeekBar(ctx: android.content.Context, sb: SeekBar) {
         try {
